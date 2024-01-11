@@ -45,6 +45,7 @@ class RedOwlCog(commands.Cog):
 
         while num_dice > 0:
             roll = [random.randint(1, num_faces) for _ in range(num_dice)]
+            roll.sort(reverse=True)
             rolls.append(roll)
             num_dice = roll.count(6)
             success += sum(r >= 3 for r in roll)
