@@ -23,20 +23,38 @@ class RedOwlCog(commands.Cog):
             return
 
         rolls, success = self.roll_dices(num_dice)
-        await ctx.send(f"{ctx.author.display_name} Request [h{num_dice}]: {', '.join(map(str, rolls))} : {success} success")        
+
+        # Création de l'embed
+        embed = discord.Embed(title=f"🎲 Résultat des lancers", color=0x4CAF50)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+        embed.add_field(name="🏆 Succès", value=f"**{success}** succès", inline=False)
+
+        # Formatage des résultats des lancers pour l'affichage
+        detailed_rolls = ' \n '.join(f"🎲 Lancer {i+1}: " + ', '.join(self.format_roll(r) for r in roll) for i, roll in enumerate(rolls))
+        embed.add_field(name="Détail des lancers", value=detailed_rolls, inline=False)
+        embed.set_footer(text=f"Demandé par {ctx.author.display_name}")
+
+        # Envoi de l'embed
+        await ctx.send(embed=embed)
 
 
-    def roll_dices(self, num_dice):
+    def roll_dices(self, num_dice: int):
         num_faces = 6
         rolls = []
         success = 0
+
         while num_dice > 0:
             roll = [random.randint(1, num_faces) for _ in range(num_dice)]
             rolls.append(roll)
             num_dice = roll.count(6)
             success += sum(r >= 3 for r in roll)
-        return rolls, success
 
+        return rolls, success
+    
+    def format_roll(self, roll):
+        if roll == 6:
+            return f"**{roll}**"
+        return str(roll)
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
@@ -120,7 +138,7 @@ class RedOwlCog(commands.Cog):
                 response_message += f"\nResponses for UserID {user_id} (member not found):\n"
                 for keyword, response in keywords.items():
                     response_message += f" - Keyword: '{keyword}' -> Response: '{response}'\n"
-    
+
         # Envoi du message en plusieurs parties si nécessaire (limite de 2000 caractères par message sur Discord)
         for chunk in [response_message[i:i+2000] for i in range(0, len(response_message), 2000)]:
             await ctx.send(chunk)
