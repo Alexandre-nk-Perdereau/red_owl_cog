@@ -138,34 +138,48 @@ class RedOwlCog(commands.Cog):
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     async def list_responses(self, ctx):
-        """Lists all the automated responses set for users in the guild."""
+        """Lists all the automated responses set for users in the guild using embeds."""
         all_response_rules = await self.config.guild(ctx.guild).response_rules()
 
         if not all_response_rules:
             await ctx.send("No automated responses set.")
             return
 
-        response_message = "Automated Responses:\n"
         for user_id, keywords in all_response_rules.items():
             member = ctx.guild.get_member(int(user_id))
-            if member:
-                response_message += f"\nResponses for {member.display_name}:\n"
-                for keyword, response in keywords.items():
-                    response_message += (
-                        f" - Keyword: '{keyword}' -> Response: '{response}'\n"
-                    )
-            else:
-                response_message += (
-                    f"\nResponses for UserID {user_id} (member not found):\n"
-                )
-                for keyword, response in keywords.items():
-                    response_message += (
-                        f" - Keyword: '{keyword}' -> Response: '{response}'\n"
-                    )
+            member_name = member.display_name if member else f"UserID {user_id}"
 
-        # Envoi du message en plusieurs parties si nécessaire (limite de 2000 caractères par message sur Discord)
-        for chunk in [
-            response_message[i : i + 2000]
-            for i in range(0, len(response_message), 2000)
-        ]:
-            await ctx.send(chunk)
+            embed = discord.Embed(
+                title=f"Automated Responses for {member_name}",
+                color=0x4CAF50
+            )
+
+            for keyword, response in keywords.items():
+                embed.add_field(
+                    name=f"Keyword: '{keyword}'",
+                    value=f"Response: '{response}'",
+                    inline=False
+                )
+
+            # Vérifier si l'embed ne dépasse pas la limite de champs
+            if len(embed.fields) <= 25 and embed.fields:
+                await ctx.send(embed=embed)
+            else:
+                # Si l'embed a trop de champs, le diviser et envoyer en plusieurs messages
+                split_embeds = self.split_embed(embed)
+                for e in split_embeds:
+                    if e.fields:
+                        await ctx.send(embed=e)
+
+    def split_embed(self, embed):
+        """Divide a large embed into smaller embeds if it exceeds field limits."""
+        embeds = []
+        current_embed = discord.Embed(title=embed.title, color=embed.color)
+        for index, field in enumerate(embed.fields):
+            if index % 25 == 0 and index != 0:
+                embeds.append(current_embed)
+                current_embed = discord.Embed(title=embed.title, color=embed.color)
+            current_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+        embeds.append(current_embed)
+        return embeds
+
