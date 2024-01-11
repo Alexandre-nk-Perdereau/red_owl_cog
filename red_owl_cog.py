@@ -13,8 +13,8 @@ class RedOwlCog(commands.Cog):
         self.config.register_guild(**default_guild)
 
     @commands.hybrid_command(aliases=['h'])
-    async def hexa(self, ctx, num_dice: int):
-        """Rolls dice and counts successes"""
+    async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
+        """Rolls dice and counts successes, with optional extra successes"""
         if num_dice < 1:
             await ctx.send("Number of dices must be at least 1")
             return
@@ -23,11 +23,17 @@ class RedOwlCog(commands.Cog):
             return
 
         rolls, success = self.roll_dices(num_dice)
+        initial_success = success 
+        success += extra_success
 
         # Création de l'embed
         embed = discord.Embed(title=f"🎲 Résultat des lancers", color=0x4CAF50)
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
-        embed.add_field(name="🏆 Succès", value=f"**{success}** succès", inline=False)
+
+        success_text = f"**{initial_success}** succès"
+        if extra_success != 0:
+            success_text += f" + **{extra_success}** succès supplémentaires = **{success}** total"
+        embed.add_field(name="🏆 Succès", value=success_text, inline=False)
 
         # Formatage des résultats des lancers pour l'affichage
         detailed_rolls = ' \n '.join(f"🎲 Lancer {i+1}: " + ', '.join(self.format_roll(r) for r in roll) for i, roll in enumerate(rolls))
