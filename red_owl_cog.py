@@ -1,7 +1,9 @@
-from redbot.core import commands, Config
-import random
-import discord
 import asyncio
+import random
+
+import discord
+from redbot.core import Config, commands
+
 
 class RedOwlCog(commands.Cog):
     """Red Owl Cog"""
@@ -12,7 +14,7 @@ class RedOwlCog(commands.Cog):
         default_guild = {"response_rules": {}}
         self.config.register_guild(**default_guild)
 
-    @commands.hybrid_command(aliases=['h'])
+    @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
         """Rolls dice and counts successes, with optional extra successes"""
         if num_dice < 1:
@@ -23,7 +25,7 @@ class RedOwlCog(commands.Cog):
             return
 
         rolls, success = self.roll_dices(num_dice)
-        initial_success = success 
+        initial_success = success
         success += extra_success
 
         # Création de l'embed
@@ -32,17 +34,21 @@ class RedOwlCog(commands.Cog):
 
         success_text = f"**{initial_success}** succès"
         if extra_success != 0:
-            success_text += f" + **{extra_success}** succès supplémentaires = **{success}** total"
+            success_text += (
+                f" + **{extra_success}** succès supplémentaires = **{success}** total"
+            )
         embed.add_field(name="🏆 Succès", value=success_text, inline=False)
 
         # Formatage des résultats des lancers pour l'affichage
-        detailed_rolls = ' \n '.join(f"🎲 Lancer {i+1}: " + ', '.join(self.format_roll(r) for r in roll) for i, roll in enumerate(rolls))
+        detailed_rolls = " \n ".join(
+            f"🎲 Lancer {i+1}: " + ", ".join(self.format_roll(r) for r in roll)
+            for i, roll in enumerate(rolls)
+        )
         embed.add_field(name="Détail des lancers", value=detailed_rolls, inline=False)
         embed.set_footer(text=f"Demandé par {ctx.author.display_name}")
 
         # Envoi de l'embed
         await ctx.send(embed=embed)
-
 
     def roll_dices(self, num_dice: int):
         num_faces = 6
@@ -57,7 +63,7 @@ class RedOwlCog(commands.Cog):
             success += sum(r >= 3 for r in roll)
 
         return rolls, success
-    
+
     def format_roll(self, roll):
         if roll == 6:
             return f"**{roll}**"
@@ -85,17 +91,22 @@ class RedOwlCog(commands.Cog):
 
         await ctx.send(f"Response set for {user.display_name} when saying '{keyword}'.")
 
-
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     async def remove_response(self, ctx, user: discord.Member, keyword: str):
         """Removes a specific automated response for a user"""
-        guild_responses = await self.config.guild(ctx.guild).response_rules.get_raw(str(user.id))
+        guild_responses = await self.config.guild(ctx.guild).response_rules.get_raw(
+            str(user.id)
+        )
 
         if keyword in guild_responses:
             del guild_responses[keyword]
-            await self.config.guild(ctx.guild).response_rules.set_raw(user.id, value=guild_responses)
-            await ctx.send(f"Removed automated response for {user.display_name} for keyword '{keyword}'.")
+            await self.config.guild(ctx.guild).response_rules.set_raw(
+                user.id, value=guild_responses
+            )
+            await ctx.send(
+                f"Removed automated response for {user.display_name} for keyword '{keyword}'."
+            )
         else:
             await ctx.send("No automated response found for that keyword and user.")
 
@@ -129,24 +140,32 @@ class RedOwlCog(commands.Cog):
     async def list_responses(self, ctx):
         """Lists all the automated responses set for users in the guild."""
         all_response_rules = await self.config.guild(ctx.guild).response_rules()
-    
+
         if not all_response_rules:
             await ctx.send("No automated responses set.")
             return
-    
+
         response_message = "Automated Responses:\n"
         for user_id, keywords in all_response_rules.items():
             member = ctx.guild.get_member(int(user_id))
             if member:
                 response_message += f"\nResponses for {member.display_name}:\n"
                 for keyword, response in keywords.items():
-                    response_message += f" - Keyword: '{keyword}' -> Response: '{response}'\n"
+                    response_message += (
+                        f" - Keyword: '{keyword}' -> Response: '{response}'\n"
+                    )
             else:
-                response_message += f"\nResponses for UserID {user_id} (member not found):\n"
+                response_message += (
+                    f"\nResponses for UserID {user_id} (member not found):\n"
+                )
                 for keyword, response in keywords.items():
-                    response_message += f" - Keyword: '{keyword}' -> Response: '{response}'\n"
+                    response_message += (
+                        f" - Keyword: '{keyword}' -> Response: '{response}'\n"
+                    )
 
         # Envoi du message en plusieurs parties si nécessaire (limite de 2000 caractères par message sur Discord)
-        for chunk in [response_message[i:i+2000] for i in range(0, len(response_message), 2000)]:
+        for chunk in [
+            response_message[i : i + 2000]
+            for i in range(0, len(response_message), 2000)
+        ]:
             await ctx.send(chunk)
-
