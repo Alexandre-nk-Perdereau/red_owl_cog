@@ -29,7 +29,7 @@ class RedOwlCog(commands.Cog):
         success += extra_success
 
         # Création de l'embed
-        embed = discord.Embed(title=f"🎲 Résultat des lancers", color=0x4CAF50)
+        embed = discord.Embed(title="🎲 Résultat des lancers", color=0x4CAF50)
         embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
 
         success_text = f"**{initial_success}** succès"
@@ -73,7 +73,6 @@ class RedOwlCog(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def response(self, ctx, user: discord.Member, keyword: str, *, response: str):
         """Sets a response for a specific keyword for a specific user"""
-        guild_id = ctx.guild.id
         user_id_str = str(user.id)
 
         # Récupérer le dictionnaire de configuration actuel pour les règles de réponse
@@ -115,25 +114,25 @@ class RedOwlCog(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        guild_id = message.guild.id
-        response_rules = await self.config.guild(message.guild).response_rules.all()
+        user_id = str(message.author.id)
+        response_rules = await self.config.guild(message.guild).response_rules()
 
-        for user_id, keywords in response_rules.items():
-            if message.author.id == int(user_id):
-                for keyword, response in keywords.items():
-                    if keyword in message.content:
-                        # Attendre un certain temps avant de répondre
-                        await asyncio.sleep(3)  # Attendre 1 secondes, par exemple
+        # Vérifiez si des règles de réponse existent pour cet utilisateur
+        if user_id in response_rules:
+            user_rules = response_rules[user_id]
+            for keyword, response in user_rules.items():
+                if keyword in message.content:
+                    # Attendre un certain temps avant de répondre
+                    await asyncio.sleep(3)
 
-                        # Vérifier si le message existe toujours
-                        try:
-                            msg = await message.channel.fetch_message(message.id)
-                            if msg:
-                                await message.channel.send(response)
-                        except discord.NotFound:
-                            # Le message a été supprimé, ne pas répondre
-                            pass
-                        break
+                    # Vérifier si le message existe toujours
+                    try:
+                        msg = await message.channel.fetch_message(message.id)
+                        if msg:
+                            await message.channel.send(response)
+                    except discord.NotFound:
+                        pass
+                    break
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
@@ -150,15 +149,14 @@ class RedOwlCog(commands.Cog):
             member_name = member.display_name if member else f"UserID {user_id}"
 
             embed = discord.Embed(
-                title=f"Automated Responses for {member_name}",
-                color=0x4CAF50
+                title=f"Automated Responses for {member_name}", color=0x4CAF50
             )
 
             for keyword, response in keywords.items():
                 embed.add_field(
                     name=f"Keyword: '{keyword}'",
                     value=f"Response: '{response}'",
-                    inline=False
+                    inline=False,
                 )
 
             # Vérifier si l'embed ne dépasse pas la limite de champs
@@ -179,7 +177,8 @@ class RedOwlCog(commands.Cog):
             if index % 25 == 0 and index != 0:
                 embeds.append(current_embed)
                 current_embed = discord.Embed(title=embed.title, color=embed.color)
-            current_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+            current_embed.add_field(
+                name=field.name, value=field.value, inline=field.inline
+            )
         embeds.append(current_embed)
         return embeds
-
