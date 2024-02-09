@@ -169,6 +169,20 @@ class RedOwlCog(commands.Cog):
                     if e.fields:
                         await ctx.send(embed=e)
 
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        """Delete the bot messages on a specific emote reaction"""
+        specific_emote = "TG"
+        if reaction.emoji.name == specific_emote and not user.bot:
+            if reaction.message.author == self.bot.user:
+                try:
+                    await reaction.message.delete()
+                except discord.Forbidden:
+                    print("Je n'ai pas les permissions pour supprimer ce message.")
+                except discord.HTTPException as e:
+                    print(f"Erreur lors de la suppression du message : {e}")
+
+
     def split_embed(self, embed):
         """Divide a large embed into smaller embeds if it exceeds field limits."""
         embeds = []
