@@ -2,6 +2,7 @@ import asyncio
 import random
 
 import discord
+import logging
 from redbot.core import Config, commands
 
 
@@ -13,6 +14,7 @@ class RedOwlCog(commands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         default_guild = {"response_rules": {}}
         self.config.register_guild(**default_guild)
+        self.logger = logging.getLogger('red.mycog.RedOwlCog')
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
@@ -49,6 +51,7 @@ class RedOwlCog(commands.Cog):
 
         # Envoi de l'embed
         await ctx.send(embed=embed)
+        self.logger.info(f"{ctx.author.display_name} {success_text} \n {detailed_rolls}")
 
     def roll_dices(self, num_dice: int):
         num_faces = 6
