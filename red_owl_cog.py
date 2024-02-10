@@ -175,15 +175,22 @@ class RedOwlCog(commands.Cog):
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
         """Delete the bot messages on a specific emote reaction"""
-        specific_emote = "TG"
-        if reaction.emoji.name == specific_emote and not user.bot:
-            if reaction.message.author == self.bot.user:
-                try:
-                    await reaction.message.delete()
-                except discord.Forbidden:
-                    print("Je n'ai pas les permissions pour supprimer ce message.")
-                except discord.HTTPException as e:
-                    print(f"Erreur lors de la suppression du message : {e}")
+        if reaction.message.author == self.bot.user:
+            specific_emote = "TG"
+
+            emoji_matches = False
+            if isinstance(reaction.emoji, discord.Emoji):  # Pour les emojis personnalisés
+                emoji_matches = reaction.emoji.name == specific_emote
+            elif isinstance(reaction.emoji, str):  # Pour les emojis standards
+                emoji_matches = reaction.emoji == specific_emote
+
+            if emoji_matches:
+                    try:
+                        await reaction.message.delete()
+                    except discord.Forbidden:
+                        print("Je n'ai pas les permissions pour supprimer ce message.")
+                    except discord.HTTPException as e:
+                        print(f"Erreur lors de la suppression du message : {e}")
 
 
     def split_embed(self, embed):
