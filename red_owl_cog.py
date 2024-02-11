@@ -12,7 +12,11 @@ class RedOwlCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
-        default_guild = {"response_rules": {}}
+        default_guild = {
+            "response_rules": {},
+            "deaf_channels": {},
+            "deaf_threads": {},
+        }
         self.config.register_guild(**default_guild)
         self.logger = logging.getLogger('red.mycog.RedOwlCog')
 
@@ -117,6 +121,15 @@ class RedOwlCog(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        channel_id = str(message.channel.id)
+        thread_id = str(message.channel.id if isinstance(message.channel, discord.Thread) else '')
+
+        deaf_channels = await self.config.guild(message.guild).deaf_channels()
+        deaf_threads = await self.config.guild(message.guild).deaf_threads()
+
+        if (deaf_channels is not None and channel_id in deaf_channels) or (deaf_threads is not None and thread_id in deaf_threads):
+            return  # Ignorer les messages si le canal ou le fil est marqué comme sourd
+
         user_id = str(message.author.id)
         response_rules = await self.config.guild(message.guild).response_rules()
 
@@ -206,3 +219,41 @@ class RedOwlCog(commands.Cog):
             )
         embeds.append(current_embed)
         return embeds
+    
+    @commands.hybrid_command()
+    async def deaf(self, ctx, *, channel_or_thread=None):
+        """Rend le bot sourd aux messages dans le canal ou le fil spécifié."""
+        target = channel_or_thread or ctx.channel
+        if isinstance(target, discord.Thread):
+            deaf_targets = await self.config.guild(ctx.guild).deaf_threads()
+            deaf_targets[str(target.id)] = True
+            await self.config.guild(ctx.guild).deaf_threads.set(deaf_targets)
+            response = f"Le bot est maintenant sourd dans le fil {target.name}."
+        else:
+            deaf_targets = await self.config.guild(ctx.guild).deaf_channels()
+            deaf_targets[str(target.id)] = True
+            await self.config.guild(ctx.guild).deaf_channels.set(deaf_targets)
+            response = f"Le bot est maintenant sourd dans {target.mention}."
+        await ctx.send(response)
+
+    @commands.hybrid_command()
+    async def undeaf(self, ctx, *, channel_or_thread=None):
+        """Permet au bot d'écouter à nouveau les messages dans le canal ou fil spécifié."""
+        target = channel_or_thread or ctx.channel
+        if isinstance(target, discord.Thread):
+            deaf_targets = await self.config.guild(ctx.guild).deaf_threads()
+            response = f"Le bot écoute maintenant à nouveau dans le fil {target.name}."
+        else:
+            deaf_targets = await self.config.guild(ctx.guild).deaf_channels()
+            response = f"Le bot écoute maintenant à nouveau dans {target.mention}."
+
+        if str(target.id) in deaf_targets:
+            del deaf_targets[str(target.id)]
+            if isinstance(target, discord.Thread):
+                await self.config.guild(ctx.guild).deaf_threads.set(deaf_targets)
+            else:
+                await self.config.guild(ctx.guild).deaf_channels.set(deaf_targets)
+            await ctx.send(response)
+        else:
+            await ctx.send("Ce canal ou fil n'était pas marqué comme sourd.")
+
