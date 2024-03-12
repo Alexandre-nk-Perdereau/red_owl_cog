@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta
 import random
 
 import discord
@@ -257,3 +258,38 @@ class RedOwlCog(commands.Cog):
         else:
             await ctx.send("Ce canal ou fil n'était pas marqué comme sourd.")
 
+    @commands.hybrid_command()
+    async def remind_me(self, ctx, duration: str, *, message: str = None):
+        """Définit un rappel après une durée spécifiée."""
+        time_units = {
+            'm': 'minutes',
+            'h': 'hours',
+            'd': 'days'
+        }
+
+        try:
+            amount = int(duration[:-1])
+            unit = duration[-1].lower()
+            if unit not in time_units:
+                raise ValueError
+        except (ValueError, IndexError):
+            await ctx.send("Format de durée invalide. Utilisez un nombre suivi de 'm' (minutes), 'h' (heures) ou 'd' (jours).")
+            return
+
+        reminder_time = datetime.now() + timedelta(**{time_units[unit]: amount})
+        human_readable_time = reminder_time.strftime("%d/%m/%Y à %H:%M:%S")
+
+        reminder_text = message or "Pas de message de rappel spécifié."
+
+        await ctx.send(f"Rappel défini pour le {human_readable_time}.")
+
+        async def send_reminder():
+            await asyncio.sleep((reminder_time - datetime.now()).total_seconds())
+
+            if isinstance(ctx.interaction, discord.Interaction):
+                await ctx.send(f"{ctx.author.mention}, voici votre rappel : {reminder_text}")
+            else:
+                reminder_message = await ctx.channel.fetch_message(ctx.message.id)
+                await ctx.send(f"{ctx.author.mention}, voici votre rappel : {reminder_message.jump_url}")
+
+        self.bot.loop.create_task(send_reminder())
