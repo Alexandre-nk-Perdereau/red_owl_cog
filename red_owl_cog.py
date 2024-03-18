@@ -19,7 +19,7 @@ class RedOwlCog(commands.Cog):
             "deaf_threads": {},
         }
         self.config.register_guild(**default_guild)
-        self.logger = logging.getLogger('red.mycog.RedOwlCog')
+        self.logger = logging.getLogger("red.mycog.RedOwlCog")
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
@@ -56,7 +56,9 @@ class RedOwlCog(commands.Cog):
 
         # Envoi de l'embed
         await ctx.send(embed=embed)
-        self.logger.info(f"{ctx.author.display_name} {success_text} \n {detailed_rolls}")
+        self.logger.info(
+            f"{ctx.author.display_name} {success_text} \n {detailed_rolls}"
+        )
 
     def roll_dices(self, num_dice: int):
         num_faces = 6
@@ -76,6 +78,38 @@ class RedOwlCog(commands.Cog):
         if roll == 6:
             return f"**{roll}**"
         return str(roll)
+
+    @commands.hybrid_command()
+    async def fate(self, ctx, bonus: int = 0):
+        """Rolls 4 Fate dice and applies an optional bonus."""
+        dice = [-1, 0, 1]  # Possible values for each Fate die
+        rolls = [random.choice(dice) for _ in range(4)]  # Roll 4 dice
+        total = sum(rolls) + bonus  # Calculate the total by adding the bonus
+
+        # Create an embed to display the result
+        embed = discord.Embed(title="🎲 Résultat du lancer Fate", color=0x4CAF50)
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar.url)
+
+        # Display the roll details
+        roll_details = " ".join(self.format_fate_die(r) for r in rolls)
+        embed.add_field(name="Lancers", value=roll_details, inline=False)
+
+        # Display the bonus if it's non-zero
+        if bonus != 0:
+            embed.add_field(name="Bonus", value=f"{bonus:+}", inline=False)
+
+        # Display the total
+        embed.add_field(name="Total", value=str(total), inline=False)
+
+        await ctx.send(embed=embed)
+
+    def format_fate_die(self, roll):
+        if roll == -1:
+            return "[-]"
+        elif roll == 1:
+            return "[+]"
+        else:
+            return "[0]"
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
@@ -123,12 +157,16 @@ class RedOwlCog(commands.Cog):
             return
 
         channel_id = str(message.channel.id)
-        thread_id = str(message.channel.id if isinstance(message.channel, discord.Thread) else '')
+        thread_id = str(
+            message.channel.id if isinstance(message.channel, discord.Thread) else ""
+        )
 
         deaf_channels = await self.config.guild(message.guild).deaf_channels()
         deaf_threads = await self.config.guild(message.guild).deaf_threads()
 
-        if (deaf_channels is not None and channel_id in deaf_channels) or (deaf_threads is not None and thread_id in deaf_threads):
+        if (deaf_channels is not None and channel_id in deaf_channels) or (
+            deaf_threads is not None and thread_id in deaf_threads
+        ):
             return  # Ignorer les messages si le canal ou le fil est marqué comme sourd
 
         user_id = str(message.author.id)
@@ -193,19 +231,20 @@ class RedOwlCog(commands.Cog):
             specific_emote = "TG"
 
             emoji_matches = False
-            if isinstance(reaction.emoji, discord.Emoji):  # Pour les emojis personnalisés
+            if isinstance(
+                reaction.emoji, discord.Emoji
+            ):  # Pour les emojis personnalisés
                 emoji_matches = reaction.emoji.name == specific_emote
             elif isinstance(reaction.emoji, str):  # Pour les emojis standards
                 emoji_matches = reaction.emoji == specific_emote
 
             if emoji_matches:
-                    try:
-                        await reaction.message.delete()
-                    except discord.Forbidden:
-                        print("Je n'ai pas les permissions pour supprimer ce message.")
-                    except discord.HTTPException as e:
-                        print(f"Erreur lors de la suppression du message : {e}")
-
+                try:
+                    await reaction.message.delete()
+                except discord.Forbidden:
+                    print("Je n'ai pas les permissions pour supprimer ce message.")
+                except discord.HTTPException as e:
+                    print(f"Erreur lors de la suppression du message : {e}")
 
     def split_embed(self, embed):
         """Divide a large embed into smaller embeds if it exceeds field limits."""
@@ -220,7 +259,7 @@ class RedOwlCog(commands.Cog):
             )
         embeds.append(current_embed)
         return embeds
-    
+
     @commands.hybrid_command()
     async def deaf(self, ctx, *, channel_or_thread=None):
         """Rend le bot sourd aux messages dans le canal ou le fil spécifié."""
@@ -261,11 +300,7 @@ class RedOwlCog(commands.Cog):
     @commands.hybrid_command()
     async def remind_me(self, ctx, duration: str, *, message: str = None):
         """Définit un rappel après une durée spécifiée."""
-        time_units = {
-            'm': 'minutes',
-            'h': 'hours',
-            'd': 'days'
-        }
+        time_units = {"m": "minutes", "h": "hours", "d": "days"}
 
         try:
             amount = int(duration[:-1])
@@ -273,7 +308,9 @@ class RedOwlCog(commands.Cog):
             if unit not in time_units:
                 raise ValueError
         except (ValueError, IndexError):
-            await ctx.send("Format de durée invalide. Utilisez un nombre suivi de 'm' (minutes), 'h' (heures) ou 'd' (jours).")
+            await ctx.send(
+                "Format de durée invalide. Utilisez un nombre suivi de 'm' (minutes), 'h' (heures) ou 'd' (jours)."
+            )
             return
 
         reminder_time = datetime.now() + timedelta(**{time_units[unit]: amount})
@@ -287,9 +324,13 @@ class RedOwlCog(commands.Cog):
             await asyncio.sleep((reminder_time - datetime.now()).total_seconds())
 
             if isinstance(ctx.interaction, discord.Interaction):
-                await ctx.send(f"{ctx.author.mention}, voici votre rappel : {reminder_text}")
+                await ctx.send(
+                    f"{ctx.author.mention}, voici votre rappel : {reminder_text}"
+                )
             else:
                 reminder_message = await ctx.channel.fetch_message(ctx.message.id)
-                await ctx.send(f"{ctx.author.mention}, voici votre rappel : {reminder_message.jump_url}")
+                await ctx.send(
+                    f"{ctx.author.mention}, voici votre rappel : {reminder_message.jump_url}"
+                )
 
         self.bot.loop.create_task(send_reminder())
