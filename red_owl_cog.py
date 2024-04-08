@@ -346,22 +346,30 @@ class RedOwlCog(commands.Cog):
         if message is None:
             return
 
-        if message.attachments and message.attachments[0].filename.endswith((".mp3", ".wav", ".ogg")):
+        if message.attachments and message.attachments[0].filename.endswith(
+            (".mp3", ".wav", ".ogg")
+        ):
             file_extension = os.path.splitext(message.attachments[0].filename)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_audio:
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=file_extension
+            ) as temp_audio:
                 await message.attachments[0].save(temp_audio.name)
                 transcription = await self.transcribe_audio(temp_audio.name)
             try:
                 os.unlink(temp_audio.name)
             except FileNotFoundError:
                 pass  # File has been already deleted, ignore this error
-        elif message.content.startswith("https://cdn.discordapp.com/attachments/") and message.content.endswith((".mp3", ".wav", ".ogg")):
+        elif message.content.startswith(
+            "https://cdn.discordapp.com/attachments/"
+        ) and message.content.endswith((".mp3", ".wav", ".ogg")):
             # get file extension from the URL
             file_extension = os.path.splitext(message.content)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_audio:
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=file_extension
+            ) as temp_audio:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(message.content) as response:
-                        with open(temp_audio.name, 'wb') as f:
+                        with open(temp_audio.name, "wb") as f:
                             while True:
                                 chunk = await response.content.read(1024)
                                 if not chunk:
@@ -377,7 +385,6 @@ class RedOwlCog(commands.Cog):
             return
 
         await ctx.send(f"Transcription: {transcription}")
-
 
     async def get_message_from_link(self, ctx, link):
         """Récupère un message à partir d'un lien."""
@@ -395,7 +402,6 @@ class RedOwlCog(commands.Cog):
         except (IndexError, ValueError):
             await ctx.send("Lien de message invalide.")
         return None
-
 
     async def transcribe_audio(self, audio_path):
         """Transcrit un fichier audio en texte."""
@@ -418,7 +424,9 @@ class RedOwlCog(commands.Cog):
                     audio.export(wav_path, format="wav")
                     audio_path = wav_path
                 else:
-                    raise ValueError(f"Le format de fichier {file_extension} n'est pas pris en charge.")
+                    raise ValueError(
+                        f"Le format de fichier {file_extension} n'est pas pris en charge."
+                    )
 
             with sr.AudioFile(audio_path) as source:
                 audio = recognizer.record(source)
