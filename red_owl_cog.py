@@ -2,6 +2,10 @@ import asyncio
 import logging
 import random
 from datetime import datetime, timedelta
+import os
+import tempfile
+import speech_recognition as sr
+from pydub import AudioSegment
 
 import discord
 from redbot.core import Config, commands
@@ -334,3 +338,103 @@ class RedOwlCog(commands.Cog):
                 )
 
         self.bot.loop.create_task(send_reminder())
+
+    @commands.hybrid_command()
+    async def speech2text(self, ctx, message_link: str):
+        """Transcrit un message audio en texte."""
+        message = await self.get_message_from_link(ctx, message_link)
+        if message is None:
+            return
+
+        if message.attachments and message.attachments[0].filename.endswith((".mp3", ".wav", ".ogg")):
+            file_extension = os.path.splitext(message.attachments[0].filename)[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_audio:
+                await message.attachments[0].save(temp_audio.name)
+                transcription = await self.transcribe_audio(temp_audio.name)
+            try:
+                os.unlink(temp_audio.name)
+            except FileNotFoundError:
+                pass  # File has been already deleted, ignore this error
+        elif message.content.startswith("https://cdn.discordapp.com/attachments/") and message.content.endswith((".mp3", ".wav", ".ogg")):
+            # get file extension from the URL
+            file_extension = os.path.splitext(message.content)[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_audio:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(message.content) as response:
+                        with open(temp_audio.name, 'wb') as f:
+                            while True:
+                                chunk = await response.content.read(1024)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                transcription = await self.transcribe_audio(temp_audio.name)
+            try:
+                os.unlink(temp_audio.name)
+            except FileNotFoundError:
+                pass  # File has been already deleted, ignore this error
+        else:
+            await ctx.send("Le message lié ne contient pas d'audio valide.")
+            return
+
+        await ctx.send(f"Transcription: {transcription}")
+
+
+    async def get_message_from_link(self, ctx, link):
+        """Récupère un message à partir d'un lien."""
+        try:
+            message_id = int(link.split("/")[-1])
+            channel_id = int(link.split("/")[-2])
+            guild = ctx.guild
+            channel = guild.get_channel(channel_id)
+            if channel:
+                try:
+                    message = await channel.fetch_message(message_id)
+                    return message
+                except discord.NotFound:
+                    await ctx.send("Message introuvable.")
+        except (IndexError, ValueError):
+            await ctx.send("Lien de message invalide.")
+        return None
+
+
+    async def transcribe_audio(self, audio_path):
+        """Transcrit un fichier audio en texte."""
+        recognizer = sr.Recognizer()
+
+        try:
+            _, file_extension = os.path.splitext(audio_path)
+            wav_path = None
+
+            # convert to wav if necessary
+            if file_extension.lower() != ".wav":
+                audio = None
+                if file_extension.lower() == ".ogg":
+                    audio = AudioSegment.from_ogg(audio_path)
+                elif file_extension.lower() == ".mp3":
+                    audio = AudioSegment.from_mp3(audio_path)
+                if audio:
+                    # Exporter the audio to WAV
+                    wav_path = os.path.splitext(audio_path)[0] + ".wav"
+                    audio.export(wav_path, format="wav")
+                    audio_path = wav_path
+                else:
+                    raise ValueError(f"Le format de fichier {file_extension} n'est pas pris en charge.")
+
+            with sr.AudioFile(audio_path) as source:
+                audio = recognizer.record(source)
+            try:
+                text = recognizer.recognize_google(audio, language="fr-FR")
+                return text
+            except sr.UnknownValueError:
+                return "Impossible de transcrire l'audio."
+            except sr.RequestError as e:
+                return f"Erreur lors de la transcription : {str(e)}"
+
+        except Exception as e:
+            return f"Erreur lors du traitement de l'audio : {str(e)}"
+
+        finally:
+            if file_extension.lower() != ".wav" and os.path.exists(audio_path):
+                os.remove(audio_path)
+            if wav_path and os.path.exists(wav_path):
+                os.remove(wav_path)
