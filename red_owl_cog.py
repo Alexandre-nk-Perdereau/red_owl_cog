@@ -340,8 +340,48 @@ class RedOwlCog(commands.Cog):
         self.bot.loop.create_task(send_reminder())
 
     @commands.hybrid_command()
-    async def speech2text(self, ctx, message_link: str):
-        """Transcrit un message audio en texte."""
+    async def speech2text(self, ctx, message_link: str, language: str = "french"):
+        """
+        Transcrit un message audio en texte.
+
+        Langues disponibles:
+        - french (Français)
+        - english (Anglais)
+        - spanish (Espagnol)
+        - german (Allemand)
+        - italian (Italien)
+        - portuguese (Portugais)
+        - dutch (Néerlandais)
+        - russian (Russe)
+        - japanese (Japonais)
+        - chinese (Chinois simplifié)
+        - korean (Coréen)
+
+        Utilisez le nom de la langue (entre parenthèses) comme argument.
+        """
+        lang_codes = {
+            "french": "fr-FR",
+            "english": "en-US",
+            "spanish": "es-ES",
+            "german": "de-DE",
+            "italian": "it-IT",
+            "portuguese": "pt-PT",
+            "dutch": "nl-NL",
+            "russian": "ru-RU",
+            "japanese": "ja-JP",
+            "chinese": "zh-CN",
+            "korean": "ko-KR",
+        }
+        language = language.lower()
+
+        if language not in lang_codes:
+            await ctx.send(
+                f"Langue non prise en charge. Les langues disponibles sont : {', '.join(lang_codes.keys())}"
+            )
+            return
+
+        language_code = lang_codes[language]
+
         message = await self.get_message_from_link(ctx, message_link)
         if message is None:
             return
@@ -354,7 +394,9 @@ class RedOwlCog(commands.Cog):
                 delete=False, suffix=file_extension
             ) as temp_audio:
                 await message.attachments[0].save(temp_audio.name)
-                transcription = await self.transcribe_audio(temp_audio.name)
+                transcription = await self.transcribe_audio(
+                    temp_audio.name, language_code
+                )
             try:
                 os.unlink(temp_audio.name)
             except FileNotFoundError:
@@ -375,7 +417,9 @@ class RedOwlCog(commands.Cog):
                                 if not chunk:
                                     break
                                 f.write(chunk)
-                transcription = await self.transcribe_audio(temp_audio.name)
+                transcription = await self.transcribe_audio(
+                    temp_audio.name, language_code
+                )
             try:
                 os.unlink(temp_audio.name)
             except FileNotFoundError:
@@ -403,7 +447,7 @@ class RedOwlCog(commands.Cog):
             await ctx.send("Lien de message invalide.")
         return None
 
-    async def transcribe_audio(self, audio_path):
+    async def transcribe_audio(self, audio_path, language_code):
         """Transcrit un fichier audio en texte."""
         recognizer = sr.Recognizer()
 
@@ -431,7 +475,7 @@ class RedOwlCog(commands.Cog):
             with sr.AudioFile(audio_path) as source:
                 audio = recognizer.record(source)
             try:
-                text = recognizer.recognize_google(audio, language="fr-FR")
+                text = recognizer.recognize_google(audio, language=language_code)
                 return text
             except sr.UnknownValueError:
                 return "Impossible de transcrire l'audio."
