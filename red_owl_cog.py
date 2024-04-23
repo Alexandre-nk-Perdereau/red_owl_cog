@@ -340,7 +340,9 @@ class RedOwlCog(commands.Cog):
         self.bot.loop.create_task(send_reminder())
 
     @commands.hybrid_command()
-    async def speech2text(self, ctx, message_link: str, language: str = "french"):
+    async def speech2text(
+        self, ctx, message_link: str, language: str = "french", service: str = "google"
+    ):
         """
         Transcrit un message audio en texte.
 
@@ -358,6 +360,10 @@ class RedOwlCog(commands.Cog):
         - korean (Coréen)
 
         Utilisez le nom de la langue (entre parenthèses) comme argument.
+
+        Services disponibles:
+        - google (par défaut)
+        - local (utilise Vosk pour une reconnaissance vocale locale)
         """
         lang_codes = {
             "french": "fr-FR",
@@ -395,7 +401,7 @@ class RedOwlCog(commands.Cog):
             ) as temp_audio:
                 await message.attachments[0].save(temp_audio.name)
                 transcription = await self.transcribe_audio(
-                    temp_audio.name, language_code
+                    temp_audio.name, language_code, service
                 )
             try:
                 os.unlink(temp_audio.name)
@@ -418,7 +424,7 @@ class RedOwlCog(commands.Cog):
                                     break
                                 f.write(chunk)
                 transcription = await self.transcribe_audio(
-                    temp_audio.name, language_code
+                    temp_audio.name, language_code, service
                 )
             try:
                 os.unlink(temp_audio.name)
@@ -428,7 +434,22 @@ class RedOwlCog(commands.Cog):
             await ctx.send("Le message lié ne contient pas d'audio valide.")
             return
 
-        await ctx.send(f"Transcription: {transcription}")
+        self.logger.info(f"Transcription: {transcription}")
+
+        max_length = 2000  # max message length
+        if len(transcription) < max_length:
+            await ctx.send(f"Transcription: {transcription}")
+        else:
+            messages = [
+                transcription[i : i + max_length]
+                for i in range(0, len(transcription), max_length)
+            ]
+
+            await ctx.send("Transcription :")
+
+            for message in messages:
+                await ctx.send(message)
+                await asyncio.sleep(0.25)  # delay between each msg to
 
     async def get_message_from_link(self, ctx, link):
         """Récupère un message à partir d'un lien."""
@@ -447,15 +468,13 @@ class RedOwlCog(commands.Cog):
             await ctx.send("Lien de message invalide.")
         return None
 
-    async def transcribe_audio(self, audio_path, language_code):
+    async def transcribe_audio(self, audio_path, language_code, service):
         """Transcrit un fichier audio en texte."""
-        recognizer = sr.Recognizer()
-
         try:
             _, file_extension = os.path.splitext(audio_path)
             wav_path = None
 
-            # convert to wav if necessary
+            # Convertir en WAV si nécessaire
             if file_extension.lower() != ".wav":
                 audio = None
                 if file_extension.lower() == ".ogg":
@@ -463,30 +482,108 @@ class RedOwlCog(commands.Cog):
                 elif file_extension.lower() == ".mp3":
                     audio = AudioSegment.from_mp3(audio_path)
                 if audio:
-                    # Exporter the audio to WAV
-                    wav_path = os.path.splitext(audio_path)[0] + ".wav"
+                    # Exporter l'audio en WAV
+                    fd, wav_path = tempfile.mkstemp(suffix=".wav")
                     audio.export(wav_path, format="wav")
+                    os.close(fd)
                     audio_path = wav_path
                 else:
                     raise ValueError(
                         f"Le format de fichier {file_extension} n'est pas pris en charge."
                     )
 
-            with sr.AudioFile(audio_path) as source:
-                audio = recognizer.record(source)
-            try:
-                text = recognizer.recognize_google(audio, language=language_code)
-                return text
-            except sr.UnknownValueError:
-                return "Impossible de transcrire l'audio."
-            except sr.RequestError as e:
-                return f"Erreur lors de la transcription : {str(e)}"
+            if service == "google":
+                transcription = await self.transcribe_google(audio_path, language_code)
+            elif service == "local":
+                transcription = await self.transcribe_local(audio_path, language_code)
+            else:
+                raise ValueError(
+                    f"Service de reconnaissance vocale {service} non pris en charge."
+                )
+
+            return transcription
 
         except Exception as e:
             return f"Erreur lors du traitement de l'audio : {str(e)}"
 
         finally:
+            # Supprimer les fichiers temporaires
             if file_extension.lower() != ".wav" and os.path.exists(audio_path):
                 os.remove(audio_path)
             if wav_path and os.path.exists(wav_path):
                 os.remove(wav_path)
+
+    async def transcribe_google(self, audio_path, language_code):
+        """Transcrit un fichier audio en texte."""
+        recognizer = sr.Recognizer()
+
+        with sr.AudioFile(audio_path) as source:
+            audio = recognizer.record(source)
+        try:
+            text = recognizer.recognize_google(audio, language=language_code)
+            return text
+        except sr.UnknownValueError:
+            return "Impossible de transcrire l'audio."
+        except sr.RequestError as e:
+            return f"Erreur lors de la transcription : {str(e)}"
+
+    async def transcribe_local(self, audio_path, language_code):
+        """Transcrit un fichier audio en texte en utilisant Vosk."""
+        if language_code != "fr-FR":
+            return "Seul le français est pour l'instant supporté en local, veuillez utilisez le service Google pour une autre langue"
+        try:
+            from vosk import Model, KaldiRecognizer, SetLogLevel
+            import wave
+            import json
+
+            SetLogLevel(0)  # Afficher les logs de Vosk pour le débogage
+
+            model_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "models",
+                "vosk-model-small-fr-0.22",
+            )
+            self.logger.info(f"Chemin du modèle Vosk : {model_path}")
+
+            model = Model(model_path)
+            self.logger.info("Modèle Vosk chargé")
+
+            wf = wave.open(audio_path, "rb")
+
+            self.logger.info(f"Fichier audio ouvert : {audio_path}")
+            self.logger.info(f"Taux d'échantillonnage : {wf.getframerate()}")
+
+            # Rééchantillonner le fichier audio si nécessaire
+            target_sample_rate = (
+                16000  # Taux d'échantillonnage cible (à ajuster selon le modèle Vosk)
+            )
+            if wf.getframerate() != target_sample_rate:
+                self.logger.info(
+                    f"Rééchantillonnage du fichier audio à {target_sample_rate} Hz"
+                )
+                audio = AudioSegment.from_wav(audio_path)
+                audio = audio.set_frame_rate(target_sample_rate)
+                audio.export(audio_path, format="wav")
+                wf = wave.open(audio_path, "rb")
+
+            rec = KaldiRecognizer(model, wf.getframerate())
+            self.logger.info("KaldiRecognizer initialisé")
+
+            while True:
+                data = wf.readframes(4000)
+                if len(data) == 0:
+                    break
+                rec.AcceptWaveform(data)
+                # res = json.loads(rec.Result())
+                # self.logger.info(res)
+                # else:
+                # res = json.loads(rec.PartialResult())
+                # self.logger.info(res)
+
+            result = rec.FinalResult()
+            self.logger.info(f"Résultat de la transcription : {result}")
+
+            return json.loads(result)["text"]
+
+        except Exception as e:
+            return f"Erreur lors de la transcription locale : {str(e)}"
