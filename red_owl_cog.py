@@ -1,4 +1,8 @@
 import asyncio
+import base64
+import io
+import time
+import aiohttp
 import logging
 import random
 from datetime import datetime, timedelta
@@ -587,3 +591,159 @@ class RedOwlCog(commands.Cog):
 
         except Exception as e:
             return f"Erreur lors de la transcription locale : {str(e)}"
+
+    @commands.hybrid_command()
+    async def draw(
+        self,
+        ctx,
+        prompt: str,
+        model: str,
+        amount: int = 1,
+        width: int = 1024,
+        height: int = 1024,
+        steps: int = 40,
+        sampler_name: str = "k_dpmpp_2s_a",
+        timeout: int = 600,
+        cfg_scale: int = 7,
+    ):
+        """Génère une image avec l'API REST d'AI Horde."""
+        # Vérifier si les paramètres obligatoires sont fournis
+        if not prompt or not model:
+            await ctx.send("Les paramètres prompt et model sont obligatoires.")
+            return
+
+        with open(
+            os.path.join(os.path.dirname(__file__), "horde_api_key.txt"), "r"
+        ) as file:
+            api_key = file.read().strip()
+
+        # Définir les paramètres de la requête
+        payload = {
+            "prompt": prompt,
+            "params": {
+                "sampler_name": sampler_name,
+                "cfg_scale": cfg_scale,
+                "seed": "",
+                "height": height,
+                "width": width,
+                "steps": steps,
+                "n": amount,
+            },
+            "nsfw": True,
+            "r2": False,  # Désactiver l'upload vers R2
+            "shared": True,
+            "models": [model],
+        }
+
+        headers = {
+            "apikey": api_key,
+            "Client-Agent": "ai-horde-bot/1.0",
+        }
+
+        try:
+            # Envoyer la requête de génération d'image à l'API d'AI Horde
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://stablehorde.net/api/v2/generate/async",
+                    json=payload,
+                    headers=headers,
+                ) as response:
+                    if response.status == 202:
+                        data = await response.json()
+                        request_id = data["id"]
+                        kudos = data["kudos"]
+                        await ctx.send(
+                            f"La génération d'image a été lancée avec succès. ID de la requête : {request_id}. Coût en Kudos : {kudos}"
+                        )
+
+                        # Attendre que la génération soit terminée
+                        start_time = time.time()
+                        while True:
+                            if time.time() - start_time > timeout:
+                                await ctx.send("La génération d'image a expiré.")
+                                return
+                            await asyncio.sleep(
+                                5
+                            )  # Attendre 5 secondes avant de vérifier à nouveau l'état de la requête
+                            self.logger.info("Vérification de l'état de la requête...")
+                            async with session.get(
+                                f"https://stablehorde.net/api/v2/generate/check/{request_id}"
+                            ) as check_response:
+                                if check_response.status == 200:
+                                    check_data = await check_response.json()
+                                    if check_data["done"]:
+                                        self.logger.info(
+                                            "La génération d'image est terminée."
+                                        )
+                                        break
+                                    else:
+                                        self.logger.info(
+                                            f"État de la requête : {check_data}"
+                                        )
+                                else:
+                                    self.logger.warning(
+                                        f"Erreur lors de la vérification de l'état de la requête. Code de statut : {check_response.status}"
+                                    )
+
+                        # Récupérer les résultats de la génération d'image
+                        async with session.get(
+                            f"https://stablehorde.net/api/v2/generate/status/{request_id}"
+                        ) as status_response:
+                            self.logger.info(
+                                "Récupération des résultats de la génération d'image..."
+                            )
+                            if status_response.status == 200:
+                                status_data = await status_response.json()
+                                files = []
+                                for generation in status_data["generations"]:
+                                    image_data = generation["img"]
+
+                                    # Décoder l'image depuis la base64
+                                    image_binary = base64.b64decode(image_data)
+
+                                    # Créer un fichier image en mémoire
+                                    image_file = io.BytesIO(image_binary)
+                                    image_file.seek(0)
+                                    discord_file = discord.File(
+                                        image_file, filename=f"{generation['id']}.webp"
+                                    )
+
+                                    # Ajouter le fichier à la liste
+                                    files.append(discord_file)
+                                await ctx.reply(files=files)
+                            else:
+                                await ctx.reply(
+                                    f"Erreur lors de la récupération des résultats. Code de statut : {status_response.status}"
+                                )
+                    else:
+                        await ctx.reply(
+                            f"Erreur lors de la génération d'image. Code de statut : {response.status}"
+                        )
+        except Exception as e:
+            self.logger.error(
+                f"Une erreur s'est produite lors de la génération d'image : {str(e)}"
+            )
+            await ctx.send("Une erreur s'est produite lors de la génération d'image.")
+
+    @commands.hybrid_command()
+    async def kudos(self, ctx):
+        with open(
+            os.path.join(os.path.dirname(__file__), "horde_api_key.txt"), "r"
+        ) as file:
+            api_key = file.read().strip()
+
+        headers = {
+            "apikey": api_key,
+            "Client-Agent": "ai-horde-bot/1.0",
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://stablehorde.net/api/v2/find_user", headers=headers
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    kudos = data["kudos"]
+                    await ctx.send(f"Vous avez actuellement {kudos} Kudos.")
+                else:
+                    await ctx.send("Erreur lors de la récupération des Kudos.")
