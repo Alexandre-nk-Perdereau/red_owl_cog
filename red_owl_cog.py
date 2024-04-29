@@ -8,6 +8,7 @@ import random
 from datetime import datetime, timedelta
 import os
 import tempfile
+import json
 import speech_recognition as sr
 from pydub import AudioSegment
 
@@ -603,8 +604,9 @@ class RedOwlCog(commands.Cog):
         height: int = 1024,
         steps: int = 40,
         sampler_name: str = "k_dpmpp_2s_a",
-        timeout: int = 600,
+        timeout: int = 300,
         cfg_scale: int = 7,
+        negative_prompt: str = "",
     ):
         """Génère une image avec l'API REST d'AI Horde."""
         # Vérifier si les paramètres obligatoires sont fournis
@@ -616,6 +618,9 @@ class RedOwlCog(commands.Cog):
             os.path.join(os.path.dirname(__file__), "horde_api_key.txt"), "r"
         ) as file:
             api_key = file.read().strip()
+
+        if negative_prompt != "":
+            prompt += "###" + negative_prompt
 
         # Définir les paramètres de la requête
         payload = {
@@ -630,10 +635,13 @@ class RedOwlCog(commands.Cog):
                 "n": amount,
             },
             "nsfw": True,
-            "r2": False,  # Désactiver l'upload vers R2
+            "r2": True,  # Activer l'upload vers R2
             "shared": True,
             "models": [model],
         }
+
+        if model == "Pony Diffusion XL":
+            payload["params"]["clip_skip"] = 2
 
         headers = {
             "apikey": api_key,
@@ -643,6 +651,7 @@ class RedOwlCog(commands.Cog):
         try:
             # Envoyer la requête de génération d'image à l'API d'AI Horde
             async with aiohttp.ClientSession() as session:
+                self.logger.info(f"Generation request: {json.dumps(payload)}")
                 async with session.post(
                     "https://stablehorde.net/api/v2/generate/async",
                     json=payload,
@@ -652,7 +661,7 @@ class RedOwlCog(commands.Cog):
                         data = await response.json()
                         request_id = data["id"]
                         kudos = data["kudos"]
-                        await ctx.send(
+                        status_message = await ctx.send(
                             f"La génération d'image a été lancée avec succès. ID de la requête : {request_id}. Coût en Kudos : {kudos}"
                         )
 
@@ -680,6 +689,11 @@ class RedOwlCog(commands.Cog):
                                         self.logger.info(
                                             f"État de la requête : {check_data}"
                                         )
+                                        # Mettre à jour le message avec les informations d'avancement
+                                        await status_message.edit(
+                                            content=f"La génération d'image est en cours. ID de la requête : {request_id}. Coût en Kudos : {kudos}\n"
+                                            f"Avancement : {check_data['finished']} terminées, {check_data['processing']} en traitement, {check_data['waiting']} en attente."
+                                        )
                                 else:
                                     self.logger.warning(
                                         f"Erreur lors de la vérification de l'état de la requête. Code de statut : {check_response.status}"
@@ -696,20 +710,28 @@ class RedOwlCog(commands.Cog):
                                 status_data = await status_response.json()
                                 files = []
                                 for generation in status_data["generations"]:
-                                    image_data = generation["img"]
+                                    image_url = generation["img"]
 
-                                    # Décoder l'image depuis la base64
-                                    image_binary = base64.b64decode(image_data)
+                                    # Télécharger l'image à partir de l'URL
+                                    async with session.get(image_url) as image_response:
+                                        if image_response.status == 200:
+                                            image_data = await image_response.read()
 
-                                    # Créer un fichier image en mémoire
-                                    image_file = io.BytesIO(image_binary)
-                                    image_file.seek(0)
-                                    discord_file = discord.File(
-                                        image_file, filename=f"{generation['id']}.webp"
-                                    )
+                                            # Créer un fichier image en mémoire
+                                            image_file = io.BytesIO(image_data)
+                                            image_file.seek(0)
+                                            discord_file = discord.File(
+                                                image_file,
+                                                filename=f"{generation['id']}.webp",
+                                            )
 
-                                    # Ajouter le fichier à la liste
-                                    files.append(discord_file)
+                                            # Ajouter le fichier à la liste
+                                            files.append(discord_file)
+                                        else:
+                                            self.logger.warning(
+                                                f"Erreur lors du téléchargement de l'image. Code de statut : {image_response.status}"
+                                            )
+
                                 await ctx.reply(files=files)
                             else:
                                 await ctx.reply(
