@@ -1,11 +1,13 @@
 import discord
-from redbot.core import Config, commands
+from redbot.core import Config, commands, checks
+
+from .archive_commands import ArchiveCommands
 from .dice_commands import DiceCommands
 from .response_commands import ResponseCommands
 import asyncio
 from datetime import datetime, timedelta
-from .archive_commands import ArchiveCommands
-
+from .alt_text_commands import AltTextCommands
+import re
 
 class RedOwlCog(commands.Cog):
     def __init__(self, bot):
@@ -15,11 +17,14 @@ class RedOwlCog(commands.Cog):
             "response_rules": {},
             "deaf_channels": {},
             "deaf_threads": {},
+            "feur_channels": [],
+            "alt_text_channels": []
         }
         self.config.register_guild(**default_guild)
         self.archive_commands = ArchiveCommands(bot)
         self.dice_commands = DiceCommands()
         self.response_commands = ResponseCommands(self.config)
+        self.alt_text_commands = AltTextCommands(bot, self.config)
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
@@ -44,6 +49,62 @@ class RedOwlCog(commands.Cog):
     async def list_responses(self, ctx):
         await self.response_commands.list_responses(ctx)
 
+    @commands.command()
+    async def feur(self, ctx):
+        """Active/désactive la réponse 'feur' dans le canal actuel."""
+        channel_id = str(ctx.channel.id)
+        feur_channels = await self.config.guild(ctx.guild).feur_channels()
+        
+        if channel_id in feur_channels:
+            feur_channels.remove(channel_id)
+            await ctx.send("Réponse 'feur' désactivée dans ce canal.")
+        else:
+            feur_channels.append(channel_id)
+            await ctx.send("Réponse 'feur' activée dans ce canal.")
+        
+        await self.config.guild(ctx.guild).feur_channels.set(feur_channels)
+
+    async def check_quoi(self, message):
+        """Vérifie si le message se termine par un son 'quoi' et répond 'feur'."""
+        patterns = [
+            'kw[ao]',
+            'qu?[ao][yi]',
+            'k[ao][yi]',
+            'qu?[oô]'
+        ]
+        
+        combined_pattern = f"(?:{'|'.join(patterns)})\\s*[!?.,;]*\\s*$"
+        
+        if re.search(combined_pattern, message.content, re.IGNORECASE):
+            await asyncio.sleep(1)
+            try:
+                msg = await message.channel.fetch_message(message.id)
+                if msg:
+                    await message.channel.send("feur !")
+            except discord.NotFound:
+                pass
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+
+        channel_id = str(message.channel.id)
+        thread_id = str(message.channel.id if isinstance(message.channel, discord.Thread) else "")
+        
+        deaf_channels = await self.config.guild(message.guild).deaf_channels()
+        deaf_threads = await self.config.guild(message.guild).deaf_threads()
+        if (deaf_channels is not None and channel_id in deaf_channels) or (
+            deaf_threads is not None and thread_id in deaf_threads
+        ):
+            return
+
+        await self.response_commands.check_and_respond(message)
+        
+        feur_channels = await self.config.guild(message.guild).feur_channels()
+        if channel_id in feur_channels:
+            await self.check_quoi(message)
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -56,13 +117,16 @@ class RedOwlCog(commands.Cog):
 
         deaf_channels = await self.config.guild(message.guild).deaf_channels()
         deaf_threads = await self.config.guild(message.guild).deaf_threads()
-
         if (deaf_channels is not None and channel_id in deaf_channels) or (
             deaf_threads is not None and thread_id in deaf_threads
         ):
             return
 
         await self.response_commands.check_and_respond(message)
+
+        feur_channels = set(await self.config.guild(message.guild).feur_channels())
+        if channel_id in feur_channels:
+            await self.check_quoi(message)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -155,12 +219,47 @@ class RedOwlCog(commands.Cog):
 
         self.bot.loop.create_task(send_reminder())
 
-    @commands.hybrid_command()
-    @commands.has_permissions(administrator=True)
-    async def archive_thread(self, ctx, thread_url: str):
-        await self.archive_commands.archive_thread(ctx, thread_url)
+
+
 
     @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
-    async def archive_channel(self, ctx, channel: discord.TextChannel):
-        await self.archive_commands.archive_channel(ctx, channel)
+    async def activate_image_alt_text(self, ctx):
+        """Active/désactive la génération de texte alternatif pour les images dans ce canal."""
+        await self.alt_text_commands.activate_image_alt_text(ctx)
+
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+        channel_id = str(message.channel.id)
+        alt_text_channels = await self.config.guild(message.guild).alt_text_channels()
+        thread_id = str(
+            message.channel.id if isinstance(message.channel, discord.Thread) else ""
+        )
+        deaf_channels = await self.config.guild(message.guild).deaf_channels()
+        deaf_threads = await self.config.guild(message.guild).deaf_threads()
+        if (deaf_channels is not None and channel_id in deaf_channels) or (
+            deaf_threads is not None and thread_id in deaf_threads
+        ):
+            return
+        await self.response_commands.check_and_respond(message)
+        feur_channels = set(await self.config.guild(message.guild).feur_channels())
+        if channel_id in feur_channels:
+            await self.check_quoi(message)
+        if channel_id in alt_text_channels and message.attachments:
+          await self.alt_text_commands.generate_alt_text_for_images(message)
+    
+    @commands.hybrid_command(name="transfer")
+    @checks.admin_or_permissions(manage_guild=True) # Keep permissions on the command itself
+    async def transfer(self, ctx: commands.Context, *, channel_link: str):
+        """
+        Transfère les messages d'un canal (via son lien) vers le canal actuel.
+        
+        Recrée les fils de discussion si possible. Utilisation réservée aux admins.
+        Exemple: [p]transfer https://discord.com/channels/GUILD_ID/CHANNEL_ID
+        """
+        # Delegate the logic to the ArchiveCommands class instance
+        await self.archive_commands.transfer(ctx, channel_link)
+
