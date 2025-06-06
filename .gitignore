@@ -3,3 +3,4 @@ models/*
 *api_key.txt
 
 .env
+.json
