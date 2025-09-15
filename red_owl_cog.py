@@ -1,5 +1,8 @@
 import discord
+import dotenv
 from redbot.core import Config, commands, checks
+
+from .seedream_commands import SeedreamCommands
 from .archive_commands import ArchiveCommands
 from .dice_commands import DiceCommands
 from .response_commands import ResponseCommands
@@ -15,6 +18,7 @@ class RedOwlCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
+        dotenv.load_dotenv("/home/alexa/cogs/red_owl_cog/.env", override=True)
         default_guild = {
             "response_rules": {},
             "deaf_channels": {},
@@ -29,6 +33,7 @@ class RedOwlCog(commands.Cog):
         self.response_commands = ResponseCommands(self.config)
         self.alt_text_commands = AltTextCommands(bot, self.config)
         self.tournoi_commands = TournoiCommands(bot, self.config)
+        self.seedream_commands = SeedreamCommands(bot)
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
@@ -285,3 +290,14 @@ class RedOwlCog(commands.Cog):
     async def tournoi_status(self, ctx):
         """Affiche le statut du tournoi en cours."""
         await self.tournoi_commands.tournament_status(ctx)
+
+    @commands.hybrid_command(name="gen")
+    async def gen(self, ctx, width: int, height: int, *, prompt: str):
+        """
+        Génère ou édite une image avec Seedream v4 (FAL).
+        Usage: !gen <width> <height> <prompt>
+        - Sans image jointe : génération (txt2img)
+        - Avec images jointes : édition (img2img) sur les pièces jointes (max 10)
+        Contraintes: width/height ∈ [1024, 4096]. Safety désactivée.
+        """
+        await self.seedream_commands.gen(ctx, width, height, prompt=prompt)
