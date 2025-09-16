@@ -1,10 +1,7 @@
-      
-import discord
 import google.generativeai as genai
 import os
-from redbot.core import commands, Config
-import asyncio
 import tempfile
+
 
 class AltTextCommands:
     """Commandes pour générer du texte alternatif pour les images."""
@@ -35,8 +32,10 @@ class AltTextCommands:
         model = genai.GenerativeModel(self.alt_default_model)
 
         for attachment in message.attachments:
-            if attachment.content_type.startswith('image/'):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{attachment.filename.split('.')[-1]}") as temp_image:
+            if attachment.content_type.startswith("image/"):
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=f".{attachment.filename.split('.')[-1]}"
+                ) as temp_image:
                     await attachment.save(temp_image.name)
 
                 image = genai.upload_file(temp_image.name)
@@ -44,8 +43,12 @@ class AltTextCommands:
                 try:
                     response = model.generate_content(["Décrivez cette image:", image])
                     alt_text = response.text
-                    await message.channel.send(f"Texte alternatif pour {attachment.filename}: {alt_text}")
+                    await message.channel.send(
+                        f"Texte alternatif pour {attachment.filename}: {alt_text}"
+                    )
                 except Exception as e:
-                    await message.channel.send(f"Erreur lors de la génération du texte alternatif pour {attachment.filename}: {e}")
+                    await message.channel.send(
+                        f"Erreur lors de la génération du texte alternatif pour {attachment.filename}: {e}"
+                    )
                 finally:
                     os.unlink(temp_image.name)

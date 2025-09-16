@@ -15,13 +15,13 @@ class TournoiCommands:
         self.active_tournaments = {}  # guild_id -> tournament_data
         self.setup_sessions = {}  # user_id -> setup_data
         self.google_forms_handler = GoogleFormsHandler()
-        
+
         asyncio.create_task(self.load_active_tournaments())
-    
+
     async def load_active_tournaments(self):
         """Charge les tournois actifs depuis la configuration."""
         await asyncio.sleep(2)
-        
+
         for guild in self.bot.guilds:
             try:
                 tournaments = await self.config.guild(guild).active_tournaments()
@@ -30,9 +30,13 @@ class TournoiCommands:
                         guild_id = int(guild_id_str)
                         if tournament_data and tournament_data.get("state") == "active":
                             self.active_tournaments[guild_id] = tournament_data
-                            print(f"[Tournament] Tournoi chargé pour le serveur {guild.name}")
+                            print(
+                                f"[Tournament] Tournoi chargé pour le serveur {guild.name}"
+                            )
             except Exception as e:
-                print(f"[Tournament] Erreur lors du chargement des tournois pour {guild.name}: {e}")
+                print(
+                    f"[Tournament] Erreur lors du chargement des tournois pour {guild.name}: {e}"
+                )
 
     async def start_tournament_setup(self, ctx):
         """Démarre la configuration d'un tournoi en MP."""
@@ -112,21 +116,21 @@ class TournoiCommands:
                     return True
 
                 session["step"] = "vote_mode"
-                
+
                 embed = discord.Embed(
                     title="🏆 Configuration du Tournoi",
                     description=f"**Participants:** {len(session['participants'])} ajoutés\n\n**Étape 3/6: Mode de vote**\n\nComment veux-tu gérer les votes?\n\n**1️⃣ Discord** - Les matchs sont affichés dans Discord avec des réactions (mode classique)\n**2️⃣ Google Forms** - Un formulaire Google est créé pour chaque tour (plus organisé pour beaucoup de participants)\n\nRéponds avec **1** ou **2**",
                     color=0x3498DB,
                 )
-                
+
                 if not self.google_forms_handler.credentials:
                     embed.add_field(
                         name="⚠️ Note",
                         value="Google Forms nécessite une configuration préalable. Si non configuré, le mode Discord sera utilisé.",
-                        inline=False
+                        inline=False,
                     )
-                
-                await message.channel.send(embed=embed)  
+
+                await message.channel.send(embed=embed)
             else:
                 name = content.strip()
                 image_url = None
@@ -183,14 +187,14 @@ class TournoiCommands:
                 else:
                     session["vote_mode"] = "google_forms"
                     mode_text = "Google Forms"
-                    
+
                     if not self.google_forms_handler.credentials:
                         await message.channel.send(
                             "⚠️ Google Forms n'est pas configuré. Utilisation du mode Discord par défaut."
                         )
                         session["vote_mode"] = "discord"
                         mode_text = "Discord (réactions)"
-                
+
                 session["step"] = "channel"
                 channels_list = "\n".join(
                     [
@@ -206,7 +210,9 @@ class TournoiCommands:
                 )
                 await message.channel.send(embed=embed)
             else:
-                await message.channel.send("❌ Réponds avec **1** pour Discord ou **2** pour Google Forms")
+                await message.channel.send(
+                    "❌ Réponds avec **1** pour Discord ou **2** pour Google Forms"
+                )
                 return True
 
         elif session["step"] == "channel":
@@ -320,54 +326,54 @@ class TournoiCommands:
             return f"{seconds // 86400} jours"
 
     async def launch_tournament(self, session):
-            """Lance le tournoi avec les paramètres configurés."""
-            guild = session["guild"]
+        """Lance le tournoi avec les paramètres configurés."""
+        guild = session["guild"]
 
-            participants = session["participants"][:]
-            random.shuffle(participants)
+        participants = session["participants"][:]
+        random.shuffle(participants)
 
-            tournament_data = {
-                "theme": session["theme"],
-                "participants": {str(p["id"]): p for p in participants},
-                "channel_id": session["channel"].id,
-                "vote_duration": session["vote_duration"],
-                "between_rounds_delay": session["between_rounds_delay"],
-                "creator_id": session["creator"].id,
-                "current_round": 1,
-                "matches": {},
-                "results": {},
-                "bracket": self.create_bracket(participants),
-                "state": "active",
-                "created_at": datetime.now().isoformat(),
-                "vote_mode": session["vote_mode"],
-                "current_form_id": None,
-            }
+        tournament_data = {
+            "theme": session["theme"],
+            "participants": {str(p["id"]): p for p in participants},
+            "channel_id": session["channel"].id,
+            "vote_duration": session["vote_duration"],
+            "between_rounds_delay": session["between_rounds_delay"],
+            "creator_id": session["creator"].id,
+            "current_round": 1,
+            "matches": {},
+            "results": {},
+            "bracket": self.create_bracket(participants),
+            "state": "active",
+            "created_at": datetime.now().isoformat(),
+            "vote_mode": session["vote_mode"],
+            "current_form_id": None,
+        }
 
-            guild_id_int = guild.id if isinstance(guild.id, int) else int(guild.id)
-            
-            self.active_tournaments[guild_id_int] = tournament_data
-            tournaments = await self.config.guild(guild).active_tournaments()
-            tournaments[str(guild_id_int)] = tournament_data
-            await self.config.guild(guild).active_tournaments.set(tournaments)
+        guild_id_int = guild.id if isinstance(guild.id, int) else int(guild.id)
 
-            embed = discord.Embed(
-                title=f"🏆 TOURNOI: {session['theme']}",
-                description=f"Un nouveau tournoi commence avec **{len(participants)} participants**!\n\nLe tournoi se déroulera en élimination directe. {'Votez pour votre préféré dans chaque match!' if session['vote_mode'] == 'discord' else 'Un formulaire Google sera partagé pour voter!'}\n\n**Mode de vote:** {'Discord (réactions)' if session['vote_mode'] == 'discord' else 'Google Forms'}\n**Durée des votes:** {self.format_duration(session['vote_duration'])}\n**Créé par:** {session['creator'].mention}",
-                color=0xF39C12,
-                timestamp=datetime.utcnow(),
-            )
-            embed.set_footer(text="Que le meilleur gagne!")
+        self.active_tournaments[guild_id_int] = tournament_data
+        tournaments = await self.config.guild(guild).active_tournaments()
+        tournaments[str(guild_id_int)] = tournament_data
+        await self.config.guild(guild).active_tournaments.set(tournaments)
 
-            announcement = await session["channel"].send(embed=embed)
-            try:
-                await announcement.pin()
-            except:
-                pass  # Si on ne peut pas épingler, ce n'est pas grave
+        embed = discord.Embed(
+            title=f"🏆 TOURNOI: {session['theme']}",
+            description=f"Un nouveau tournoi commence avec **{len(participants)} participants**!\n\nLe tournoi se déroulera en élimination directe. {'Votez pour votre préféré dans chaque match!' if session['vote_mode'] == 'discord' else 'Un formulaire Google sera partagé pour voter!'}\n\n**Mode de vote:** {'Discord (réactions)' if session['vote_mode'] == 'discord' else 'Google Forms'}\n**Durée des votes:** {self.format_duration(session['vote_duration'])}\n**Créé par:** {session['creator'].mention}",
+            color=0xF39C12,
+            timestamp=datetime.utcnow(),
+        )
+        embed.set_footer(text="Que le meilleur gagne!")
 
-            await asyncio.sleep(5)
+        announcement = await session["channel"].send(embed=embed)
+        try:
+            await announcement.pin()
+        except:
+            pass  # Si on ne peut pas épingler, ce n'est pas grave
 
-            await self.start_round(guild_id_int)
-    
+        await asyncio.sleep(5)
+
+        await self.start_round(guild_id_int)
+
     def create_bracket(self, participants):
         """Crée la structure du bracket du tournoi."""
         n = len(participants)
@@ -414,59 +420,59 @@ class TournoiCommands:
         return bracket
 
     async def start_round(self, guild_id):
-            """Démarre un nouveau tour du tournoi."""
-            if isinstance(guild_id, str):
-                guild_id = int(guild_id)
-                
-            tournament = self.active_tournaments.get(guild_id)
-            if not tournament:
-                print(f"[Tournament] Aucun tournoi trouvé pour guild_id: {guild_id}")
-                return
+        """Démarre un nouveau tour du tournoi."""
+        if isinstance(guild_id, str):
+            guild_id = int(guild_id)
 
-            guild = self.bot.get_guild(guild_id)
-            if not guild:
-                print(f"[Tournament] Guild non trouvé: {guild_id}")
-                return
+        tournament = self.active_tournaments.get(guild_id)
+        if not tournament:
+            print(f"[Tournament] Aucun tournoi trouvé pour guild_id: {guild_id}")
+            return
 
-            channel = guild.get_channel(tournament["channel_id"])
-            if not channel:
-                print(f"[Tournament] Channel non trouvé: {tournament['channel_id']}")
-                return
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            print(f"[Tournament] Guild non trouvé: {guild_id}")
+            return
 
-            current_round = tournament["bracket"]["current_round"]
+        channel = guild.get_channel(tournament["channel_id"])
+        if not channel:
+            print(f"[Tournament] Channel non trouvé: {tournament['channel_id']}")
+            return
 
-            round_matches = [
-                m
-                for m in tournament["bracket"]["matches"].values()
-                if m["round"] == current_round
-                and m["winner"] is None
-                and m["participant1"] is not None
-            ]
+        current_round = tournament["bracket"]["current_round"]
 
-            if not round_matches:
-                tournament["bracket"]["current_round"] += 1
-                await self.create_next_round_matches(guild_id)
-                await self.start_round(guild_id)
-                return
+        round_matches = [
+            m
+            for m in tournament["bracket"]["matches"].values()
+            if m["round"] == current_round
+            and m["winner"] is None
+            and m["participant1"] is not None
+        ]
 
-            embed = discord.Embed(
-                title=f"🥊 TOUR {current_round}",
-                description=f"**{len(round_matches)} matchs** vont se dérouler!\n\n{'Votez avec les réactions 1️⃣ et 2️⃣' if tournament['vote_mode'] == 'discord' else 'Un formulaire Google va être partagé pour voter!'}",
-                color=0xE74C3C,
-            )
-            await channel.send(embed=embed)
+        if not round_matches:
+            tournament["bracket"]["current_round"] += 1
+            await self.create_next_round_matches(guild_id)
+            await self.start_round(guild_id)
+            return
 
-            if tournament["vote_mode"] == "google_forms":
-                await self.start_round_google_forms(guild_id, round_matches)
-            else:
-                await self.start_round_discord(guild_id, round_matches)
+        embed = discord.Embed(
+            title=f"🥊 TOUR {current_round}",
+            description=f"**{len(round_matches)} matchs** vont se dérouler!\n\n{'Votez avec les réactions 1️⃣ et 2️⃣' if tournament['vote_mode'] == 'discord' else 'Un formulaire Google va être partagé pour voter!'}",
+            color=0xE74C3C,
+        )
+        await channel.send(embed=embed)
+
+        if tournament["vote_mode"] == "google_forms":
+            await self.start_round_google_forms(guild_id, round_matches)
+        else:
+            await self.start_round_discord(guild_id, round_matches)
 
     async def start_round_discord(self, guild_id, round_matches):
         """Démarre un tour avec le mode de vote Discord (méthode originale)."""
         tournament = self.active_tournaments[guild_id]
         guild = self.bot.get_guild(guild_id)
         channel = guild.get_channel(tournament["channel_id"])
-        
+
         tasks = []
         bye_messages = []
 
@@ -505,314 +511,313 @@ class TournoiCommands:
         await self.finalize_round(guild_id, tournament["bracket"]["current_round"])
 
     async def start_round_google_forms(self, guild_id, round_matches):
-            """Démarre un tour avec Google Forms."""
-            tournament = self.active_tournaments[guild_id]
-            guild = self.bot.get_guild(guild_id)
-            channel = guild.get_channel(tournament["channel_id"])
-            
-            bye_messages = []
-            active_matches = []
-            
-            for match in round_matches:
-                if match["participant1"] is None:
-                    continue
-                elif match["participant2"] is None:
-                    match["winner"] = match["participant1"]
-                    participant = tournament["participants"][str(match["participant1"])]
+        """Démarre un tour avec Google Forms."""
+        tournament = self.active_tournaments[guild_id]
+        guild = self.bot.get_guild(guild_id)
+        channel = guild.get_channel(tournament["channel_id"])
 
-                    tournament["results"][match["id"]] = {
-                        "winner": match["participant1"],
-                        "participant1_votes": 0,
-                        "participant2_votes": 0,
-                        "bye": True,
-                        "participant1_name": participant["name"],
-                        "participant2_name": None,
-                    }
+        bye_messages = []
+        active_matches = []
 
-                    bye_embed = discord.Embed(
-                        title="🎯 Passage automatique",
-                        description=f"**{participant['name']}** passe automatiquement au tour suivant!",
-                        color=0x2ECC71,
-                    )
-                    bye_messages.append(channel.send(embed=bye_embed))
-                else:
-                    active_matches.append(match)
-            
-            if bye_messages:
-                await asyncio.gather(*bye_messages)
-                await asyncio.sleep(2)
-            
-            if not active_matches:
-                await self.finalize_round(guild_id, tournament["bracket"]["current_round"])
-                return
-            
-            waiting_embed = discord.Embed(
-                title="⏳ Création du formulaire de vote...",
-                description="Merci de patienter quelques secondes pendant la préparation du formulaire Google.",
-                color=0xF39C12
-            )
-            waiting_msg = await channel.send(embed=waiting_embed)
-            
-            form_matches = []
-            for match in active_matches:
-                p1 = tournament["participants"][str(match["participant1"])]
-                p2 = tournament["participants"][str(match["participant2"])]
-                
-                form_match = {
-                    "match_id": match["id"],
-                    "participant1_id": match["participant1"],
-                    "participant2_id": match["participant2"],
-                    "participant1_name": p1["name"],
-                    "participant2_name": p2["name"],
-                    "participant1_image": p1.get("image"),
-                    "participant2_image": p2.get("image"),
-                }
-                form_matches.append(form_match)
-            
-            form_id, form_url = await self.google_forms_handler.create_tournament_form(
-                tournament["theme"],
-                tournament["bracket"]["current_round"],
-                form_matches,
-                self.format_duration(tournament["vote_duration"])
-            )
-            
-            try:
-                await waiting_msg.delete()
-            except:
-                pass
-            
-            if not form_id:
-                error_embed = discord.Embed(
-                    title="⚠️ Erreur Google Forms",
-                    description="Impossible de créer le formulaire Google. Utilisation du mode Discord à la place.",
-                    color=0xE74C3C
-                )
-                await channel.send(embed=error_embed)
-                await self.start_round_discord(guild_id, round_matches)
-                return
-            
-            tournament["current_form_id"] = form_id
-            
-            form_embed = discord.Embed(
-                title="🗳️ VOTEZ MAINTENANT !",
-                description=f"**Tour {tournament['bracket']['current_round']}** du tournoi **{tournament['theme']}**",
-                color=0x4285F4
-            )
-            
-            form_embed.add_field(
-                name="📋 Accès au formulaire",
-                value=f"[**Cliquez ici pour voter**]({form_url})",
-                inline=False
-            )
-            
-            form_embed.add_field(
-                name="⏱️ Temps restant",
-                value=self.format_duration(tournament['vote_duration']),
-                inline=True
-            )
-            
-            form_embed.add_field(
-                name="🥊 Matchs",
-                value=f"{len(active_matches)} matchs",
-                inline=True
-            )
-            
-            form_embed.add_field(
-                name="💡 Conseils",
-                value="• Les images sont cliquables pour agrandir\n• Un seul vote par personne\n• Tous les matchs sont obligatoires",
-                inline=False
-            )
-            
-            form_embed.set_footer(
-                text="Le formulaire sera automatiquement supprimé à la fin du vote",
-                icon_url="https://upload.wikimedia.org/wikipedia/commons/5/5b/Google_Forms_2020_Logo.svg"
-            )
-            
-            form_embed.timestamp = datetime.utcnow()
-            
-            form_message = await channel.send(embed=form_embed)
-            
-            try:
-                await form_message.pin()
-            except:
-                pass  # Si on ne peut pas épingler, ce n'est pas grave
-            
-            total_time = tournament["vote_duration"]
-            start_time = asyncio.get_event_loop().time()
-            
-            reminders = {
-                # 0.25: ("⏰ Rappel", 0xF39C12),
-                0.50: ("⏰ Mi-temps", 0xF39C12),
-                # 0.75: ("⏰ Dernier quart", 0xF39C12),
-                0.90: ("⚠️ DERNIÈRE CHANCE !", 0xE74C3C)
-            }
-            
-            reminders_sent = set()
-            
-            while True:
-                elapsed = asyncio.get_event_loop().time() - start_time
-                remaining = total_time - elapsed
-                
-                if remaining <= 0:
-                    break
-                
-                progress = elapsed / total_time
-                for threshold, (title, color) in reminders.items():
-                    if progress >= threshold and threshold not in reminders_sent:
-                        reminders_sent.add(threshold)
-                        reminder_embed = discord.Embed(
-                            title=title,
-                            description=f"Il reste **{self.format_duration(int(remaining))}** pour voter !",
-                            color=color
-                        )
-                        await channel.send(embed=reminder_embed, delete_after=300)
-                
-                await asyncio.sleep(min(30, remaining))
-            
-            try:
-                closed_embed = discord.Embed(
-                    title="🔒 Vote terminé",
-                    description="**Le temps de vote est écoulé!**\n\nLes résultats sont en cours de traitement...",
-                    color=0xE74C3C,
-                    timestamp=datetime.utcnow()
-                )
-                closed_embed.set_footer(text="Merci à tous les participants!")
-                await form_message.edit(embed=closed_embed)
-                
-                await form_message.unpin()
-            except:
-                pass
-            
-            processing_embed = discord.Embed(
-                title="🔄 Traitement des résultats",
-                description="Calcul des votes en cours...",
-                color=0x3498DB
-            )
-            processing_msg = await channel.send(embed=processing_embed)
-            
-            await self.process_google_form_results(guild_id, form_id, active_matches)
-            
-            try:
-                await processing_msg.delete()
-            except:
-                pass
-            
-            deleted = await self.google_forms_handler.delete_form(form_id)
-            if deleted:
-                print(f"Formulaire {form_id} supprimé avec succès")
-            else:
-                print(f"Impossible de supprimer le formulaire {form_id}")
-            
-            tournament["current_form_id"] = None
-            
-            await self.finalize_round(guild_id, tournament["bracket"]["current_round"])
- 
-    async def process_google_form_results(self, guild_id, form_id, matches):
-            """Traite les résultats d'un Google Form."""
-            tournament = self.active_tournaments[guild_id]
-            guild = self.bot.get_guild(guild_id)
-            channel = guild.get_channel(tournament["channel_id"])
-            
-            votes_data = await self.google_forms_handler.get_form_responses(form_id)
-            
-            if not votes_data:
-                await channel.send("⚠️ Aucun vote reçu ou erreur lors de la récupération. Sélection aléatoire des gagnants...")
-                for match in matches:
-                    match["winner"] = random.choice([match["participant1"], match["participant2"]])
-                    p1 = tournament["participants"][str(match["participant1"])]
-                    p2 = tournament["participants"][str(match["participant2"])]
-                    
-                    tournament["results"][match["id"]] = {
-                        "winner": match["winner"],
-                        "participant1_votes": 0,
-                        "participant2_votes": 0,
-                        "participant1_name": p1["name"],
-                        "participant2_name": p2["name"],
-                    }
-                return
-            
-            total_responses = 0
-            for match_votes in votes_data.values():
-                total_responses += sum(match_votes.values())
-            
-            if total_responses > 0:
-                await channel.send(f"📊 **{total_responses} votes** reçus au total!")
-            
-            for match_idx, match in enumerate(matches):
-                p1 = tournament["participants"][str(match["participant1"])]
-                p2 = tournament["participants"][str(match["participant2"])]
-                
-                match_votes = votes_data.get(str(match_idx), {})
-                
-                p1_votes = match_votes.get(str(match["participant1"]), 0)
-                p2_votes = match_votes.get(str(match["participant2"]), 0)
-                
-                print(f"[Tournament] Match {match['id']}: {p1['name']} ({p1_votes}) vs {p2['name']} ({p2_votes})")
-                
-                if p1_votes > p2_votes:
-                    winner = match["participant1"]
-                    winner_name = p1["name"]
-                elif p2_votes > p1_votes:
-                    winner = match["participant2"]
-                    winner_name = p2["name"]
-                else:
-                    if p1_votes == 0 and p2_votes == 0:
-                        await channel.send(f"⚠️ Aucun vote pour le match **{p1['name']}** vs **{p2['name']}**. Tirage au sort...")
-                    else:
-                        await channel.send(f"⚖️ Égalité dans le match **{p1['name']}** vs **{p2['name']}** ! Tirage au sort...")
-                    
-                    winner = random.choice([match["participant1"], match["participant2"]])
-                    winner_name = p1["name"] if winner == match["participant1"] else p2["name"]
-                
-                if p1_votes > 0 or p2_votes > 0:
-                    result_embed = discord.Embed(
-                        title=f"📊 Résultat - Match {match_idx + 1}",
-                        color=0x2ECC71
-                    )
-                    result_embed.add_field(
-                        name=f"{p1['name']}",
-                        value=f"**{p1_votes}** votes",
-                        inline=True
-                    )
-                    result_embed.add_field(
-                        name="VS",
-                        value="⚔️",
-                        inline=True
-                    )
-                    result_embed.add_field(
-                        name=f"{p2['name']}",
-                        value=f"**{p2_votes}** votes",
-                        inline=True
-                    )
-                    result_embed.add_field(
-                        name="🏆 Gagnant",
-                        value=f"**{winner_name}**",
-                        inline=False
-                    )
-                    
-                    await channel.send(embed=result_embed)
-                    await asyncio.sleep(1)
-                
-                match["winner"] = winner
+        for match in round_matches:
+            if match["participant1"] is None:
+                continue
+            elif match["participant2"] is None:
+                match["winner"] = match["participant1"]
+                participant = tournament["participants"][str(match["participant1"])]
+
                 tournament["results"][match["id"]] = {
-                    "winner": winner,
-                    "participant1_votes": p1_votes,
-                    "participant2_votes": p2_votes,
+                    "winner": match["participant1"],
+                    "participant1_votes": 0,
+                    "participant2_votes": 0,
+                    "bye": True,
+                    "participant1_name": participant["name"],
+                    "participant2_name": None,
+                }
+
+                bye_embed = discord.Embed(
+                    title="🎯 Passage automatique",
+                    description=f"**{participant['name']}** passe automatiquement au tour suivant!",
+                    color=0x2ECC71,
+                )
+                bye_messages.append(channel.send(embed=bye_embed))
+            else:
+                active_matches.append(match)
+
+        if bye_messages:
+            await asyncio.gather(*bye_messages)
+            await asyncio.sleep(2)
+
+        if not active_matches:
+            await self.finalize_round(guild_id, tournament["bracket"]["current_round"])
+            return
+
+        waiting_embed = discord.Embed(
+            title="⏳ Création du formulaire de vote...",
+            description="Merci de patienter quelques secondes pendant la préparation du formulaire Google.",
+            color=0xF39C12,
+        )
+        waiting_msg = await channel.send(embed=waiting_embed)
+
+        form_matches = []
+        for match in active_matches:
+            p1 = tournament["participants"][str(match["participant1"])]
+            p2 = tournament["participants"][str(match["participant2"])]
+
+            form_match = {
+                "match_id": match["id"],
+                "participant1_id": match["participant1"],
+                "participant2_id": match["participant2"],
+                "participant1_name": p1["name"],
+                "participant2_name": p2["name"],
+                "participant1_image": p1.get("image"),
+                "participant2_image": p2.get("image"),
+            }
+            form_matches.append(form_match)
+
+        form_id, form_url = await self.google_forms_handler.create_tournament_form(
+            tournament["theme"],
+            tournament["bracket"]["current_round"],
+            form_matches,
+            self.format_duration(tournament["vote_duration"]),
+        )
+
+        try:
+            await waiting_msg.delete()
+        except:
+            pass
+
+        if not form_id:
+            error_embed = discord.Embed(
+                title="⚠️ Erreur Google Forms",
+                description="Impossible de créer le formulaire Google. Utilisation du mode Discord à la place.",
+                color=0xE74C3C,
+            )
+            await channel.send(embed=error_embed)
+            await self.start_round_discord(guild_id, round_matches)
+            return
+
+        tournament["current_form_id"] = form_id
+
+        form_embed = discord.Embed(
+            title="🗳️ VOTEZ MAINTENANT !",
+            description=f"**Tour {tournament['bracket']['current_round']}** du tournoi **{tournament['theme']}**",
+            color=0x4285F4,
+        )
+
+        form_embed.add_field(
+            name="📋 Accès au formulaire",
+            value=f"[**Cliquez ici pour voter**]({form_url})",
+            inline=False,
+        )
+
+        form_embed.add_field(
+            name="⏱️ Temps restant",
+            value=self.format_duration(tournament["vote_duration"]),
+            inline=True,
+        )
+
+        form_embed.add_field(
+            name="🥊 Matchs", value=f"{len(active_matches)} matchs", inline=True
+        )
+
+        form_embed.add_field(
+            name="💡 Conseils",
+            value="• Les images sont cliquables pour agrandir\n• Un seul vote par personne\n• Tous les matchs sont obligatoires",
+            inline=False,
+        )
+
+        form_embed.set_footer(
+            text="Le formulaire sera automatiquement supprimé à la fin du vote",
+            icon_url="https://upload.wikimedia.org/wikipedia/commons/5/5b/Google_Forms_2020_Logo.svg",
+        )
+
+        form_embed.timestamp = datetime.utcnow()
+
+        form_message = await channel.send(embed=form_embed)
+
+        try:
+            await form_message.pin()
+        except:
+            pass  # Si on ne peut pas épingler, ce n'est pas grave
+
+        total_time = tournament["vote_duration"]
+        start_time = asyncio.get_event_loop().time()
+
+        reminders = {
+            # 0.25: ("⏰ Rappel", 0xF39C12),
+            0.50: ("⏰ Mi-temps", 0xF39C12),
+            # 0.75: ("⏰ Dernier quart", 0xF39C12),
+            0.90: ("⚠️ DERNIÈRE CHANCE !", 0xE74C3C),
+        }
+
+        reminders_sent = set()
+
+        while True:
+            elapsed = asyncio.get_event_loop().time() - start_time
+            remaining = total_time - elapsed
+
+            if remaining <= 0:
+                break
+
+            progress = elapsed / total_time
+            for threshold, (title, color) in reminders.items():
+                if progress >= threshold and threshold not in reminders_sent:
+                    reminders_sent.add(threshold)
+                    reminder_embed = discord.Embed(
+                        title=title,
+                        description=f"Il reste **{self.format_duration(int(remaining))}** pour voter !",
+                        color=color,
+                    )
+                    await channel.send(embed=reminder_embed, delete_after=300)
+
+            await asyncio.sleep(min(30, remaining))
+
+        try:
+            closed_embed = discord.Embed(
+                title="🔒 Vote terminé",
+                description="**Le temps de vote est écoulé!**\n\nLes résultats sont en cours de traitement...",
+                color=0xE74C3C,
+                timestamp=datetime.utcnow(),
+            )
+            closed_embed.set_footer(text="Merci à tous les participants!")
+            await form_message.edit(embed=closed_embed)
+
+            await form_message.unpin()
+        except:
+            pass
+
+        processing_embed = discord.Embed(
+            title="🔄 Traitement des résultats",
+            description="Calcul des votes en cours...",
+            color=0x3498DB,
+        )
+        processing_msg = await channel.send(embed=processing_embed)
+
+        await self.process_google_form_results(guild_id, form_id, active_matches)
+
+        try:
+            await processing_msg.delete()
+        except:
+            pass
+
+        deleted = await self.google_forms_handler.delete_form(form_id)
+        if deleted:
+            print(f"Formulaire {form_id} supprimé avec succès")
+        else:
+            print(f"Impossible de supprimer le formulaire {form_id}")
+
+        tournament["current_form_id"] = None
+
+        await self.finalize_round(guild_id, tournament["bracket"]["current_round"])
+
+    async def process_google_form_results(self, guild_id, form_id, matches):
+        """Traite les résultats d'un Google Form."""
+        tournament = self.active_tournaments[guild_id]
+        guild = self.bot.get_guild(guild_id)
+        channel = guild.get_channel(tournament["channel_id"])
+
+        votes_data = await self.google_forms_handler.get_form_responses(form_id)
+
+        if not votes_data:
+            await channel.send(
+                "⚠️ Aucun vote reçu ou erreur lors de la récupération. Sélection aléatoire des gagnants..."
+            )
+            for match in matches:
+                match["winner"] = random.choice(
+                    [match["participant1"], match["participant2"]]
+                )
+                p1 = tournament["participants"][str(match["participant1"])]
+                p2 = tournament["participants"][str(match["participant2"])]
+
+                tournament["results"][match["id"]] = {
+                    "winner": match["winner"],
+                    "participant1_votes": 0,
+                    "participant2_votes": 0,
                     "participant1_name": p1["name"],
                     "participant2_name": p2["name"],
                 }
+            return
+
+        total_responses = 0
+        for match_votes in votes_data.values():
+            total_responses += sum(match_votes.values())
+
+        if total_responses > 0:
+            await channel.send(f"📊 **{total_responses} votes** reçus au total!")
+
+        for match_idx, match in enumerate(matches):
+            p1 = tournament["participants"][str(match["participant1"])]
+            p2 = tournament["participants"][str(match["participant2"])]
+
+            match_votes = votes_data.get(str(match_idx), {})
+
+            p1_votes = match_votes.get(str(match["participant1"]), 0)
+            p2_votes = match_votes.get(str(match["participant2"]), 0)
+
+            print(
+                f"[Tournament] Match {match['id']}: {p1['name']} ({p1_votes}) vs {p2['name']} ({p2_votes})"
+            )
+
+            if p1_votes > p2_votes:
+                winner = match["participant1"]
+                winner_name = p1["name"]
+            elif p2_votes > p1_votes:
+                winner = match["participant2"]
+                winner_name = p2["name"]
+            else:
+                if p1_votes == 0 and p2_votes == 0:
+                    await channel.send(
+                        f"⚠️ Aucun vote pour le match **{p1['name']}** vs **{p2['name']}**. Tirage au sort..."
+                    )
+                else:
+                    await channel.send(
+                        f"⚖️ Égalité dans le match **{p1['name']}** vs **{p2['name']}** ! Tirage au sort..."
+                    )
+
+                winner = random.choice([match["participant1"], match["participant2"]])
+                winner_name = (
+                    p1["name"] if winner == match["participant1"] else p2["name"]
+                )
+
+            if p1_votes > 0 or p2_votes > 0:
+                result_embed = discord.Embed(
+                    title=f"📊 Résultat - Match {match_idx + 1}", color=0x2ECC71
+                )
+                result_embed.add_field(
+                    name=f"{p1['name']}", value=f"**{p1_votes}** votes", inline=True
+                )
+                result_embed.add_field(name="VS", value="⚔️", inline=True)
+                result_embed.add_field(
+                    name=f"{p2['name']}", value=f"**{p2_votes}** votes", inline=True
+                )
+                result_embed.add_field(
+                    name="🏆 Gagnant", value=f"**{winner_name}**", inline=False
+                )
+
+                await channel.send(embed=result_embed)
+                await asyncio.sleep(1)
+
+            match["winner"] = winner
+            tournament["results"][match["id"]] = {
+                "winner": winner,
+                "participant1_votes": p1_votes,
+                "participant2_votes": p2_votes,
+                "participant1_name": p1["name"],
+                "participant2_name": p2["name"],
+            }
 
     async def finalize_round(self, guild_id, round_num):
         """Finalise un tour et prépare le suivant."""
         tournament = self.active_tournaments[guild_id]
         guild = self.bot.get_guild(guild_id)
-        
+
         await self.post_round_summary(guild_id, round_num)
-        
+
         tournaments = await self.config.guild(guild).active_tournaments()
         tournaments[str(guild_id)] = tournament
         await self.config.guild(guild).active_tournaments.set(tournaments)
-        
+
         remaining_matches = [
             m
             for m in tournament["bracket"]["matches"].values()
@@ -1044,7 +1049,7 @@ class TournoiCommands:
         stats_text = f"Matchs joués: {matches_played}"
         if total_votes > 0:
             stats_text += f" | Total des votes: {total_votes}"
-        
+
         if tournament.get("vote_mode") == "google_forms":
             stats_text += " | Mode: Google Forms"
 
@@ -1178,10 +1183,10 @@ class TournoiCommands:
 
         guild_id = ctx.guild.id
         tournament = self.active_tournaments.get(guild_id)
-        
+
         if tournament and tournament.get("current_form_id"):
             await self.google_forms_handler.delete_form(tournament["current_form_id"])
-        
+
         if guild_id in self.active_tournaments:
             del self.active_tournaments[guild_id]
 
@@ -1215,9 +1220,11 @@ class TournoiCommands:
             name="Participants", value=len(tournament["participants"]), inline=True
         )
         embed.add_field(
-            name="Mode de vote", 
-            value="Discord" if tournament.get("vote_mode", "discord") == "discord" else "Google Forms", 
-            inline=True
+            name="Mode de vote",
+            value="Discord"
+            if tournament.get("vote_mode", "discord") == "discord"
+            else "Google Forms",
+            inline=True,
         )
 
         remaining = len(

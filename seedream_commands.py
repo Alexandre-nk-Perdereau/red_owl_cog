@@ -9,6 +9,7 @@ FAL_T2I_URL = "https://queue.fal.run/fal-ai/bytedance/seedream/v4/text-to-image"
 FAL_EDIT_URL = "https://queue.fal.run/fal-ai/bytedance/seedream/v4/edit"
 FAL_REQ_BASE = "https://queue.fal.run/fal-ai/bytedance/requests"
 
+
 class SeedreamCommands:
     """
     Commandes d'image pour Seedream v4 (FAL).
@@ -50,8 +51,14 @@ class SeedreamCommands:
 
             status = (s.get("status") or s.get("state") or "").upper()
             err = s.get("error")
-            done = status in {"COMPLETED", "SUCCEEDED", "SUCCESS", "DONE"} or s.get("completed") is True
-            failed = status in {"FAILED", "ERROR", "CANCELED", "CANCELLED"} or s.get("failed") is True
+            done = (
+                status in {"COMPLETED", "SUCCEEDED", "SUCCESS", "DONE"}
+                or s.get("completed") is True
+            )
+            failed = (
+                status in {"FAILED", "ERROR", "CANCELED", "CANCELLED"}
+                or s.get("failed") is True
+            )
 
             now = asyncio.get_event_loop().time()
             if now - last_notice > 6:
@@ -62,7 +69,9 @@ class SeedreamCommands:
                 if "eta" in s:
                     extra.append(f"eta {int(s['eta'])}s")
                 suffix = f" ({', '.join(extra)})" if extra else ""
-                await wait_msg.edit(content=f"🧪 Seedream v4 — {status or 'EN COURS'}… *{int(now - t0)}s*{suffix}")
+                await wait_msg.edit(
+                    content=f"🧪 Seedream v4 — {status or 'EN COURS'}… *{int(now - t0)}s*{suffix}"
+                )
 
             if err or failed:
                 raise RuntimeError(f"Traitement en erreur: {err or status}")
@@ -84,7 +93,6 @@ class SeedreamCommands:
                 raise RuntimeError(f"Récupération résultat {r.status}: {text[:300]}")
             return await r.json()
 
-
     async def gen(self, ctx, width: int, height: int, *, prompt: str):
         """
         Génère ou édite une image avec Seedream v4 (FAL).
@@ -94,7 +102,9 @@ class SeedreamCommands:
         Contraintes: width/height ∈ [1024, 4096]. Safety désactivée.
         """
         if not self.fal_key:
-            await ctx.send("⚠️ Variable d'environnement **FAL_KEY** absente. Configure-la avant d'utiliser `!gen`.")
+            await ctx.send(
+                "⚠️ Variable d'environnement **FAL_KEY** absente. Configure-la avant d'utiliser `!gen`."
+            )
             return
 
         try:
@@ -129,10 +139,14 @@ class SeedreamCommands:
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=base_payload, timeout=300) as resp:
+                async with session.post(
+                    url, headers=headers, json=base_payload, timeout=300
+                ) as resp:
                     if resp.status // 100 != 2:
                         text = await resp.text()
-                        await wait_msg.edit(content=f"❌ Erreur API ({resp.status}) : {text[:500]}")
+                        await wait_msg.edit(
+                            content=f"❌ Erreur API ({resp.status}) : {text[:500]}"
+                        )
                         return
                     data = await resp.json()
 
@@ -142,41 +156,57 @@ class SeedreamCommands:
 
                 if not images:
                     if not request_id:
-                        await wait_msg.edit(content="❌ Réponse API sans `images` ni `request_id`. Impossible de continuer.")
+                        await wait_msg.edit(
+                            content="❌ Réponse API sans `images` ni `request_id`. Impossible de continuer."
+                        )
                         return
 
-                    ok = await self._poll_status(session, headers, request_id, wait_msg, timeout_s=600)
+                    ok = await self._poll_status(
+                        session, headers, request_id, wait_msg, timeout_s=600
+                    )
                     if not ok:
-                        await wait_msg.edit(content="❌ Timeout en attendant la génération. Réessaie plus tard.")
+                        await wait_msg.edit(
+                            content="❌ Timeout en attendant la génération. Réessaie plus tard."
+                        )
                         return
 
                     status_url = f"{FAL_REQ_BASE}/{request_id}/status"
                     response_url = None
                     try:
-                        async with session.get(status_url, headers=headers, timeout=60) as r:
+                        async with session.get(
+                            status_url, headers=headers, timeout=60
+                        ) as r:
                             if r.status // 100 == 2:
                                 s = await r.json()
                                 response_url = s.get("response_url")
                     except Exception:
                         response_url = None
 
-                    result = await self._fetch_result(session, headers, request_id, response_url=response_url)
+                    result = await self._fetch_result(
+                        session, headers, request_id, response_url=response_url
+                    )
                     images = (result or {}).get("images") or []
                     seed = (result or {}).get("seed")
 
                 if not images:
-                    await wait_msg.edit(content="❌ Aucun visuel dans le résultat final.")
+                    await wait_msg.edit(
+                        content="❌ Aucun visuel dans le résultat final."
+                    )
                     return
 
                 img_meta = images[0] or {}
                 img_url = img_meta.get("url")
                 if not img_url:
-                    await wait_msg.edit(content="❌ URL d’image manquante dans le résultat.")
+                    await wait_msg.edit(
+                        content="❌ URL d’image manquante dans le résultat."
+                    )
                     return
 
                 async with session.get(img_url, timeout=180) as img_resp:
                     if img_resp.status // 100 != 2:
-                        await wait_msg.edit(content=f"❌ Impossible de récupérer l’image ({img_resp.status}).")
+                        await wait_msg.edit(
+                            content=f"❌ Impossible de récupérer l’image ({img_resp.status})."
+                        )
                         return
                     content_type = (img_resp.headers.get("Content-Type") or "").lower()
                     ext = ".png" if "png" in content_type else ".jpg"
@@ -184,7 +214,11 @@ class SeedreamCommands:
 
             embed = discord.Embed(
                 title="🖼️ Seedream v4",
-                description=("**Mode** : Edit (img2img)" if is_edit else "**Mode** : Text-to-Image"),
+                description=(
+                    "**Mode** : Edit (img2img)"
+                    if is_edit
+                    else "**Mode** : Text-to-Image"
+                ),
                 color=0x5865F2,
             )
             embed.add_field(name="Prompt", value=prompt[:1024], inline=False)
@@ -200,4 +234,6 @@ class SeedreamCommands:
         except aiohttp.ClientError as e:
             await wait_msg.edit(content=f"❌ Erreur réseau : {e}")
         except Exception as e:
-            await wait_msg.edit(content=f"❌ Erreur inattendue : {type(e).__name__}: {e}")
+            await wait_msg.edit(
+                content=f"❌ Erreur inattendue : {type(e).__name__}: {e}"
+            )
