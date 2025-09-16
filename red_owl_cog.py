@@ -1,6 +1,6 @@
 import discord
 import dotenv
-from redbot.core import Config, commands, checks
+from redbot.core import Config, commands
 
 from .seedream_commands import SeedreamCommands
 from .dice_commands import DiceCommands
@@ -8,9 +8,7 @@ from .response_commands import ResponseCommands
 import asyncio
 from datetime import datetime, timedelta
 from .alt_text_commands import AltTextCommands
-from .tournoi_commands import TournoiCommands
 import re
-import os
 
 
 class RedOwlCog(commands.Cog):
@@ -24,13 +22,11 @@ class RedOwlCog(commands.Cog):
             "deaf_threads": {},
             "feur_channels": [],
             "alt_text_channels": [],
-            "active_tournaments": {},
         }
         self.config.register_guild(**default_guild)
         self.dice_commands = DiceCommands()
         self.response_commands = ResponseCommands(self.config)
         self.alt_text_commands = AltTextCommands(bot, self.config)
-        self.tournoi_commands = TournoiCommands(bot, self.config)
         self.seedream_commands = SeedreamCommands(bot)
 
     @commands.hybrid_command(aliases=["h"])
@@ -89,10 +85,6 @@ class RedOwlCog(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         """Handler unique pour tous les messages."""
-
-        if isinstance(message.channel, discord.DMChannel) and not message.author.bot:
-            if await self.tournoi_commands.handle_setup_dm(message):
-                return
 
         if message.author.bot or not message.guild:
             return
@@ -215,24 +207,6 @@ class RedOwlCog(commands.Cog):
     async def activate_image_alt_text(self, ctx):
         """Active/désactive la génération de texte alternatif pour les images dans ce canal."""
         await self.alt_text_commands.activate_image_alt_text(ctx)
-
-
-    @commands.hybrid_command(name="tournoi")
-    @commands.has_permissions(administrator=True)
-    async def tournoi(self, ctx):
-        """Lance la configuration d'un nouveau tournoi."""
-        await self.tournoi_commands.start_tournament_setup(ctx)
-
-    @commands.hybrid_command(name="tournoi_stop")
-    @commands.has_permissions(administrator=True)
-    async def tournoi_stop(self, ctx):
-        """Arrête le tournoi en cours."""
-        await self.tournoi_commands.stop_tournament(ctx)
-
-    @commands.hybrid_command(name="tournoi_status")
-    async def tournoi_status(self, ctx):
-        """Affiche le statut du tournoi en cours."""
-        await self.tournoi_commands.tournament_status(ctx)
 
     @commands.hybrid_command(name="gen")
     async def gen(self, ctx, width: int, height: int, *, prompt: str):
