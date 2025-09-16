@@ -3,7 +3,6 @@ import dotenv
 from redbot.core import Config, commands, checks
 
 from .seedream_commands import SeedreamCommands
-from .archive_commands import ArchiveCommands
 from .dice_commands import DiceCommands
 from .response_commands import ResponseCommands
 import asyncio
@@ -28,7 +27,6 @@ class RedOwlCog(commands.Cog):
             "active_tournaments": {},
         }
         self.config.register_guild(**default_guild)
-        self.archive_commands = ArchiveCommands(bot)
         self.dice_commands = DiceCommands()
         self.response_commands = ResponseCommands(self.config)
         self.alt_text_commands = AltTextCommands(bot, self.config)
@@ -218,61 +216,6 @@ class RedOwlCog(commands.Cog):
         """Active/désactive la génération de texte alternatif pour les images dans ce canal."""
         await self.alt_text_commands.activate_image_alt_text(ctx)
 
-    @commands.hybrid_command(name="transfer")
-    @checks.admin_or_permissions(manage_guild=True)
-    async def transfer(self, ctx: commands.Context, *, channel_link: str):
-        """
-        Transfère les messages d'un canal (via son lien) vers le canal actuel.
-
-        Recrée les fils de discussion si possible. Utilisation réservée aux admins.
-        Exemple: [p]transfer https://discord.com/channels/GUILD_ID/CHANNEL_ID
-        """
-        await self.archive_commands.transfer(ctx, channel_link)
-
-    @commands.command(name="retranscrit_fil_txt", aliases=["transcript"])
-    async def retranscrit_fil_txt(self, ctx: commands.Context, *, thread_link: str):
-        """
-        Retranscrit le contenu d'un fil Discord dans un fichier .txt.
-
-        Prend en paramètre un lien direct vers le fil Discord.
-        Exemple: !retranscrit_fil_txt https://discord.com/channels/123456789/987654321
-        Fonctionne aussi en message privé avec le bot si le lien contient l'ID du serveur.
-        """
-        await ctx.typing()
-
-        (
-            file_path,
-            discord_filename_or_error,
-        ) = await self.archive_commands.generate_transcript_from_link(thread_link)
-
-        if not file_path:
-            await ctx.send(f":warning: Erreur : {discord_filename_or_error}")
-            return
-
-        discord_filename = discord_filename_or_error
-
-        try:
-            discord_file = discord.File(file_path, filename=discord_filename)
-            await ctx.send("Voici la transcription du fil demandé :", file=discord_file)
-        except discord.HTTPException as e:
-            await ctx.send(
-                f":warning: Erreur lors de l'envoi du fichier de transcription : {e}"
-            )
-        except FileNotFoundError:
-            await ctx.send(
-                ":warning: Erreur critique : Le fichier de transcription temporaire n'a pas pu être trouvé pour l'envoi."
-            )
-        except Exception as e:
-            await ctx.send(
-                f":warning: Une erreur inattendue est survenue lors de l'envoi du fichier : {e}"
-            )
-        finally:
-            if file_path and os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    print(f"Temporary transcript file removed: {file_path}")
-                except OSError as e:
-                    print(f"Error removing temporary transcript file {file_path}: {e}")
 
     @commands.hybrid_command(name="tournoi")
     @commands.has_permissions(administrator=True)
