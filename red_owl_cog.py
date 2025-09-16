@@ -6,7 +6,6 @@ from .seedream_commands import SeedreamCommands
 from .dice_commands import DiceCommands
 import asyncio
 from datetime import datetime, timedelta
-from .alt_text_commands import AltTextCommands
 
 
 class RedOwlCog(commands.Cog):
@@ -16,12 +15,9 @@ class RedOwlCog(commands.Cog):
         dotenv.load_dotenv(
             "/home/alexa/cogs/red_owl_cog/.env", override=True
         )  # TODO: improve this part to not be that specific
-        default_guild = {
-            "alt_text_channels": [],
-        }
+        default_guild = {}
         self.config.register_guild(**default_guild)
         self.dice_commands = DiceCommands()
-        self.alt_text_commands = AltTextCommands(bot, self.config)
         self.seedream_commands = SeedreamCommands(bot)
 
     @commands.hybrid_command(aliases=["h"])
@@ -38,12 +34,6 @@ class RedOwlCog(commands.Cog):
 
         if message.author.bot or not message.guild:
             return
-
-        channel_id = str(message.channel.id)
-
-        alt_text_channels = await self.config.guild(message.guild).alt_text_channels()
-        if channel_id in alt_text_channels and message.attachments:
-            await self.alt_text_commands.generate_alt_text_for_images(message)
 
     @commands.hybrid_command()
     async def remind_me(self, ctx, duration: str, *, message: str = None):
@@ -81,12 +71,6 @@ class RedOwlCog(commands.Cog):
                 )
 
         self.bot.loop.create_task(send_reminder())
-
-    @commands.hybrid_command()
-    @commands.has_permissions(administrator=True)
-    async def activate_image_alt_text(self, ctx):
-        """Active/désactive la génération de texte alternatif pour les images dans ce canal."""
-        await self.alt_text_commands.activate_image_alt_text(ctx)
 
     @commands.hybrid_command(name="gen")
     async def gen(self, ctx, width: int, height: int, *, prompt: str):
