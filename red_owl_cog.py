@@ -28,13 +28,6 @@ class RedOwlCog(commands.Cog):
     async def fate(self, ctx, bonus: int = 0):
         await self.dice_commands.fate(ctx, bonus)
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        """Handler unique pour tous les messages."""
-
-        if message.author.bot or not message.guild:
-            return
-
     @commands.hybrid_command()
     async def remind_me(self, ctx, duration: str, *, message: str = None):
         time_units = {"m": "minutes", "h": "hours", "d": "days"}

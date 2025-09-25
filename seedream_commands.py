@@ -27,7 +27,7 @@ class SeedreamCommands:
         if att.content_type and att.content_type.startswith("image/"):
             return True
         name = (att.filename or "").lower()
-        return name.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif"))
+        return name.endswith((".png", ".jpg", ".jpeg", ".webp"))
 
     @staticmethod
     def _validate_size(value: int) -> int:

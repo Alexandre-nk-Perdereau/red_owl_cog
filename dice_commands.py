@@ -6,10 +6,10 @@ class DiceCommands:
     @staticmethod
     async def hexa(ctx, num_dice: int, extra_success: int = 0):
         if num_dice < 1:
-            await ctx.send("Number of dices must be at least 1")
+            await ctx.send("Le nombre de dés doit être au minimum 1.")
             return
         if num_dice > 100:
-            await ctx.send("Number of dices must be at maximum 100")
+            await ctx.send("Le nombre de dés doit être au maximum 100.")
             return
 
         rolls, success = DiceCommands.roll_dices(num_dice)
