@@ -17,6 +17,8 @@ class SeedreamCommands:
     - Sinon : edit (img2img) avec les images du message
     """
 
+    DEFAULT_SIZE = 2048
+
     def __init__(self, bot):
         self.bot = bot
         dotenv.load_dotenv("/home/alexa/cogs/red_owl_cog/.env", override=True)
@@ -35,6 +37,35 @@ class SeedreamCommands:
         if value < 1024 or value > 4096:
             raise ValueError("La taille doit être comprise entre 1024 et 4096 px.")
         return value
+
+    @staticmethod
+    def _clamp_ratio_size(w: int, h: int) -> tuple[int, int]:
+        """
+        Contraint (w,h) à l'intervalle [1024,4096] en conservant le ratio.
+        Choisit la plus grande taille possible qui respecte les bornes.
+        """
+        MIN_S, MAX_S = 1024, 4096
+        long_side = max(w, h)
+        short_side = min(w, h)
+        ratio = long_side / short_side if short_side else 1.0
+
+        if long_side > MAX_S:
+            scale = MAX_S / long_side
+            long_side = int(round(long_side * scale))
+            short_side = int(round(short_side * scale))
+
+        if short_side < MIN_S:
+            scale = MIN_S / short_side
+            long_side = int(round(long_side * scale))
+            short_side = int(round(short_side * scale))
+            if long_side > MAX_S:
+                long_side = MAX_S
+                short_side = int(round(MAX_S / ratio))
+
+        if w >= h:
+            return long_side, short_side
+        else:
+            return short_side, long_side
 
     async def _poll_status(self, session, headers, request_id, wait_msg, timeout_s=600):
         status_url = f"{FAL_REQ_BASE}/{request_id}/status"
@@ -93,13 +124,14 @@ class SeedreamCommands:
                 raise RuntimeError(f"Récupération résultat {r.status}: {text[:300]}")
             return await r.json()
 
-    async def gen(self, ctx, width: int, height: int, *, prompt: str):
+    async def gen(self, ctx, width: int | None, height: int | None, *, prompt: str):
         """
         Génère ou édite une image avec Seedream v4 (FAL).
-        Usage: !gen <width> <height> <prompt>
-        - Sans image jointe : génération (txt2img)
-        - Avec images jointes : édition (img2img) sur les pièces jointes (max 10)
-        Contraintes: width/height ∈ [1024, 4096]. Safety désactivée.
+        Usage:
+        - !gen <prompt>                        -> taille auto
+        - !gen <width> <height> <prompt>       -> taille explicite
+        - Sans image jointe : txt2img ; avec image(s) : edit/img2img
+        Contraintes: width/height ∈ [1024, 4096] (auto-clamp si inférées).
         """
         if not self.fal_key:
             await ctx.send(
@@ -107,15 +139,31 @@ class SeedreamCommands:
             )
             return
 
+        atts = [a for a in ctx.message.attachments if self._is_image_attachment(a)]
+        image_urls = [a.url for a in atts][:10]
+        is_edit = len(image_urls) > 0
+
         try:
-            width = self._validate_size(width)
-            height = self._validate_size(height)
+            if width is not None and height is not None:
+                width = self._validate_size(width)
+                height = self._validate_size(height)
+            else:
+                if not is_edit:
+                    width = height = self.DEFAULT_SIZE
+                else:
+                    base_w = getattr(atts[0], "width", None)
+                    base_h = getattr(atts[0], "height", None)
+
+                    if not base_w or not base_h:
+                        base_w = base_h = self.DEFAULT_SIZE
+
+                    width, height = self._clamp_ratio_size(int(base_w), int(base_h))
+
+                width = self._validate_size(width)
+                height = self._validate_size(height)
         except ValueError as e:
             await ctx.send(f"❌ {e}")
             return
-
-        atts = [a for a in ctx.message.attachments if self._is_image_attachment(a)]
-        image_urls = [a.url for a in atts][:10]
 
         base_payload = {
             "prompt": prompt,
@@ -124,7 +172,6 @@ class SeedreamCommands:
             "enable_safety_checker": False,
         }
 
-        is_edit = len(image_urls) > 0
         url = FAL_EDIT_URL if is_edit else FAL_T2I_URL
         if is_edit:
             base_payload["image_urls"] = image_urls

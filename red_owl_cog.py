@@ -66,12 +66,25 @@ class RedOwlCog(commands.Cog):
         self.bot.loop.create_task(send_reminder())
 
     @commands.hybrid_command(name="gen")
-    async def gen(self, ctx, width: int, height: int, *, prompt: str):
+    async def gen(self, ctx, *, query: str):
         """
         Génère ou édite une image avec Seedream v4 (FAL).
-        Usage: !gen <width> <height> <prompt>
-        - Sans image jointe : génération (txt2img)
-        - Avec images jointes : édition (img2img) sur les pièces jointes (max 10)
-        Contraintes: width/height ∈ [1024, 4096]. Safety désactivée.
+        Nouveaux usages:
+        - !gen <prompt>                        -> taille auto
+        - !gen <width> <height> <prompt>       -> taille explicite
+        - Sans image -> txt2img ; Avec image(s) -> edit/img2img
+        Contraintes auto: tailles ∈ [1024, 4096]
         """
+        tokens = query.strip().split()
+        width = height = None
+        if len(tokens) >= 3 and all(t.isdigit() for t in tokens[:2]):
+            try:
+                width = int(tokens[0])
+                height = int(tokens[1])
+                prompt = " ".join(tokens[2:]).strip()
+            except ValueError:
+                prompt = query
+        else:
+            prompt = query
+
         await self.seedream_commands.gen(ctx, width, height, prompt=prompt)
