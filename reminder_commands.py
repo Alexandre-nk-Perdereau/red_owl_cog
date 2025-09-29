@@ -4,11 +4,14 @@ Supporte les rappels uniques et récurrents avec persistance.
 """
 
 import asyncio
+import logging
 import re
 from datetime import datetime
 from typing import Optional, Dict
 import discord
 from redbot.core import Config, commands
+
+log = logging.getLogger("red.red_owl_cog.reminders")
 
 
 class ReminderCommands:
@@ -54,7 +57,7 @@ class ReminderCommands:
             await self.config.user_from_id(user_id).reminders.set(valid_reminders)
 
         if restored_count > 0:
-            print(f"[ReminderCommands] {restored_count} rappel(s) restauré(s)")
+            log.info(f"{restored_count} rappel(s) restauré(s)")
 
     def _parse_duration(self, duration_str: str) -> Optional[int]:
         """
@@ -129,7 +132,7 @@ class ReminderCommands:
             await channel.send(user.mention, embed=embed)
 
         except Exception as e:
-            print(f"[ReminderCommands] Erreur envoi rappel: {e}")
+            log.error(f"Erreur envoi rappel: {e}", exc_info=True)
 
     def _schedule_reminder(self, reminder: dict):
         """Schedule l'envoi d'un rappel."""

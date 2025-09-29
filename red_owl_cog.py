@@ -8,9 +8,7 @@ from .reminder_commands import ReminderCommands
 class RedOwlCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=1234567890)
-        default_guild = {}
-        self.config.register_guild(**default_guild)
+        self.config = Config.get_conf(self, identifier=260823057214)
         self.dice_commands = DiceCommands()
         self.seedream_commands = SeedreamCommands(bot)
         self.reminder_commands = ReminderCommands(bot, self.config)

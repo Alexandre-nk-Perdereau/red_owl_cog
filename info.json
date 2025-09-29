@@ -1,0 +1,12 @@
+{
+    "author": ["PseudoRouge"],
+    "install_msg": "Merci d'avoir installé Red Owl Cog ! Utilisez `[p]help RedOwlCog` pour voir toutes les commandes disponibles.\n\nPour utiliser la génération d'images, configurez la variable d'environnement FAL_KEY.",
+    "name": "RedOwlCog",
+    "short": "Cog personnel avec dés (hexa/fate), rappels récurrents et génération d'images (Seedream v4)",
+    "description": "Red Owl Cog est un ensemble de commandes personnalisées incluant :\n- Système de dés avancé (hexa avec relances, fate dice)\n- Rappels uniques et récurrents avec persistance\n- Génération d'images avec Seedream v4 (text-to-image et img2img)\n\nCommandes principales : !hexa, !fate, !remind, !remind_repeat, !gen",
+    "tags": ["dice", "reminder", "image", "generation", "ai", "utility"],
+    "requirements": ["aiohttp"],
+    "hidden": false,
+    "min_bot_version": "3.5.0",
+    "min_python_version": [3, 9, 0]
+}
