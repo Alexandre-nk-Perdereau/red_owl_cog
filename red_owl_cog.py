@@ -12,9 +12,6 @@ class RedOwlCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
-        dotenv.load_dotenv(
-            "/home/alexa/cogs/red_owl_cog/.env", override=True
-        )  # TODO: improve this part to not be that specific
         default_guild = {}
         self.config.register_guild(**default_guild)
         self.dice_commands = DiceCommands()

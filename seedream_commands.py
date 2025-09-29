@@ -21,8 +21,7 @@ class SeedreamCommands:
 
     def __init__(self, bot):
         self.bot = bot
-        dotenv.load_dotenv("/home/alexa/cogs/red_owl_cog/.env", override=True)
-        self.fal_key = os.getenv("FAL_KEY", None)
+        self.fal_key = os.environ.get("FAL_KEY")
 
     @staticmethod
     def _is_image_attachment(att: discord.Attachment) -> bool:
