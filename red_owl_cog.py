@@ -18,14 +18,17 @@ class RedOwlCog(commands.Cog):
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
+        """Lance des d6 (succès sur 3+, relance sur 6)."""
         await self.dice_commands.hexa(ctx, num_dice, extra_success)
 
     @commands.hybrid_command()
     async def fate(self, ctx, bonus: int = 0):
+        """Lance 4 dés FATE (-1, 0, +1) avec bonus optionnel."""
         await self.dice_commands.fate(ctx, bonus)
 
     @commands.hybrid_command()
     async def remind_me(self, ctx, duration: str, *, message: str = None):
+        """Définit un rappel (ex: 10m, 2h, 3d)."""
         time_units = {"m": "minutes", "h": "hours", "d": "days"}
 
         try:

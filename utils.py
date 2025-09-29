@@ -2,6 +2,7 @@ import discord
 
 
 def split_embed(embed):
+    """Divise un embed en plusieurs si >25 champs."""
     embeds = []
     current_embed = discord.Embed(title=embed.title, color=embed.color)
     for index, field in enumerate(embed.fields):

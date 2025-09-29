@@ -5,6 +5,7 @@ import random
 class DiceCommands:
     @staticmethod
     async def hexa(ctx, num_dice: int, extra_success: int = 0):
+        """Lance des d6 (succès sur 3+, les 6 se relancent)."""
         if num_dice < 1:
             await ctx.send("Le nombre de dés doit être au minimum 1.")
             return
@@ -37,6 +38,7 @@ class DiceCommands:
 
     @staticmethod
     async def fate(ctx, bonus: int = 0):
+        """Lance 4dF ([-], [0], [+]) avec bonus optionnel."""
         dice = [-1, 0, 1]
         rolls = [random.choice(dice) for _ in range(4)]
         total = sum(rolls) + bonus
@@ -56,6 +58,7 @@ class DiceCommands:
 
     @staticmethod
     def roll_dices(num_dice: int):
+        """Effectue les lancers et relances (6 → relance)."""
         num_faces = 6
         rolls = []
         success = 0
