@@ -31,7 +31,9 @@ class RedOwlCog(commands.Cog):
         await self.reminder_commands.remind(ctx, duration, message=message)
 
     @commands.hybrid_command()
-    async def remind_repeat(self, ctx, interval: str, *, message: str = "Rappel récurrent"):
+    async def remind_repeat(
+        self, ctx, interval: str, *, message: str = "Rappel récurrent"
+    ):
         """Crée un rappel récurrent (ex: 1h, 1d)."""
         await self.reminder_commands.remind_repeat(ctx, interval, message=message)
 

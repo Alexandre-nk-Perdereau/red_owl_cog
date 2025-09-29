@@ -19,9 +19,7 @@ class ReminderCommands:
         self.config = config
         self.active_tasks: Dict[str, asyncio.Task] = {}
 
-        default_user = {
-            "reminders": []
-        }
+        default_user = {"reminders": []}
         self.config.register_user(**default_user)
 
         self.bot.loop.create_task(self._restore_reminders())
@@ -69,13 +67,7 @@ class ReminderCommands:
         if not matches:
             return None
 
-        time_map = {
-            "s": 1,
-            "m": 60,
-            "h": 3600,
-            "d": 86400,
-            "w": 604800
-        }
+        time_map = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
 
         total_seconds = 0
         for amount, unit in matches:
@@ -92,7 +84,7 @@ class ReminderCommands:
             ("jour", 86400),
             ("heure", 3600),
             ("minute", 60),
-            ("seconde", 1)
+            ("seconde", 1),
         ]
 
         for name, duration in units:
@@ -123,7 +115,7 @@ class ReminderCommands:
                 title="⏰ Rappel",
                 description=reminder["message"],
                 color=discord.Color.orange(),
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
             )
 
             if reminder.get("interval"):
@@ -131,7 +123,7 @@ class ReminderCommands:
                 embed.add_field(
                     name="Prochain rappel",
                     value=self._format_timestamp(next_time),
-                    inline=False
+                    inline=False,
                 )
 
             await channel.send(user.mention, embed=embed)
@@ -155,7 +147,9 @@ class ReminderCommands:
                 for i, r in enumerate(reminders):
                     if r["id"] == reminder_id:
                         if r.get("interval"):
-                            reminders[i]["timestamp"] = datetime.now().timestamp() + r["interval"]
+                            reminders[i]["timestamp"] = (
+                                datetime.now().timestamp() + r["interval"]
+                            )
                             self._schedule_reminder(reminders[i])
                         else:
                             reminders.pop(i)
@@ -170,11 +164,7 @@ class ReminderCommands:
         self.active_tasks[reminder_id] = self.bot.loop.create_task(reminder_task())
 
     async def remind(
-        self,
-        ctx: commands.Context,
-        duration: str,
-        *,
-        message: str = "Votre rappel !"
+        self, ctx: commands.Context, duration: str, *, message: str = "Votre rappel !"
     ):
         """
         Crée un rappel.
@@ -209,7 +199,7 @@ class ReminderCommands:
             "message": message[:1000],
             "timestamp": timestamp,
             "interval": None,
-            "created_at": datetime.now().timestamp()
+            "created_at": datetime.now().timestamp(),
         }
 
         async with self.config.user(ctx.author).reminders() as reminders:
@@ -218,30 +208,18 @@ class ReminderCommands:
         self._schedule_reminder(reminder)
 
         embed = discord.Embed(
-            title="✅ Rappel créé",
-            description=message,
-            color=discord.Color.green()
+            title="✅ Rappel créé", description=message, color=discord.Color.green()
         )
         embed.add_field(
-            name="Quand",
-            value=self._format_timestamp(timestamp),
-            inline=False
+            name="Quand", value=self._format_timestamp(timestamp), inline=False
         )
-        embed.add_field(
-            name="Dans",
-            value=self._format_duration(seconds),
-            inline=False
-        )
+        embed.add_field(name="Dans", value=self._format_duration(seconds), inline=False)
         embed.set_footer(text=f"ID: {reminder_id}")
 
         await ctx.send(embed=embed)
 
     async def remind_repeat(
-        self,
-        ctx: commands.Context,
-        interval: str,
-        *,
-        message: str = "Rappel récurrent"
+        self, ctx: commands.Context, interval: str, *, message: str = "Rappel récurrent"
     ):
         """
         Crée un rappel récurrent.
@@ -253,9 +231,7 @@ class ReminderCommands:
         seconds = self._parse_duration(interval)
 
         if seconds is None or seconds < 60:
-            await ctx.send(
-                "❌ **Intervalle invalide.** Minimum: 1 minute (1m)"
-            )
+            await ctx.send("❌ **Intervalle invalide.** Minimum: 1 minute (1m)")
             return
 
         if seconds > 2592000:
@@ -273,7 +249,7 @@ class ReminderCommands:
             "message": message[:1000],
             "timestamp": timestamp,
             "interval": seconds,
-            "created_at": datetime.now().timestamp()
+            "created_at": datetime.now().timestamp(),
         }
 
         async with self.config.user(ctx.author).reminders() as reminders:
@@ -284,17 +260,13 @@ class ReminderCommands:
         embed = discord.Embed(
             title="🔄 Rappel récurrent créé",
             description=message,
-            color=discord.Color.blue()
+            color=discord.Color.blue(),
         )
         embed.add_field(
-            name="Premier rappel",
-            value=self._format_timestamp(timestamp),
-            inline=False
+            name="Premier rappel", value=self._format_timestamp(timestamp), inline=False
         )
         embed.add_field(
-            name="Intervalle",
-            value=self._format_duration(seconds),
-            inline=False
+            name="Intervalle", value=self._format_duration(seconds), inline=False
         )
         embed.set_footer(text=f"ID: {reminder_id}")
 
@@ -311,8 +283,7 @@ class ReminderCommands:
         reminders.sort(key=lambda r: r["timestamp"])
 
         embed = discord.Embed(
-            title=f"📋 Vos rappels ({len(reminders)})",
-            color=discord.Color.blue()
+            title=f"📋 Vos rappels ({len(reminders)})", color=discord.Color.blue()
         )
 
         for i, reminder in enumerate(reminders[:10], 1):
@@ -320,16 +291,20 @@ class ReminderCommands:
             time_info = self._format_timestamp(reminder["timestamp"])
 
             if reminder.get("interval"):
-                time_info += f"\n*Répète tous les {self._format_duration(reminder['interval'])}*"
+                time_info += (
+                    f"\n*Répète tous les {self._format_duration(reminder['interval'])}*"
+                )
 
             embed.add_field(
                 name=f"{is_recurring} {i}. {reminder['message'][:50]}{'...' if len(reminder['message']) > 50 else ''}",
                 value=time_info,
-                inline=False
+                inline=False,
             )
 
         if len(reminders) > 10:
-            embed.set_footer(text=f"... et {len(reminders) - 10} autre(s). Utilisez !remind_clear pour nettoyer.")
+            embed.set_footer(
+                text=f"... et {len(reminders) - 10} autre(s). Utilisez !remind_clear pour nettoyer."
+            )
 
         await ctx.send(embed=embed)
 
@@ -346,7 +321,9 @@ class ReminderCommands:
                 return
 
             if reminder_index < 1 or reminder_index > len(reminders):
-                await ctx.send(f"❌ Numéro invalide. Utilisez un nombre entre 1 et {len(reminders)}.")
+                await ctx.send(
+                    f"❌ Numéro invalide. Utilisez un nombre entre 1 et {len(reminders)}."
+                )
                 return
 
             reminders.sort(key=lambda r: r["timestamp"])
@@ -358,7 +335,9 @@ class ReminderCommands:
 
             reminders.remove(reminder)
 
-            await ctx.send(f"✅ Rappel **{reminder_index}** annulé : *{reminder['message'][:100]}*")
+            await ctx.send(
+                f"✅ Rappel **{reminder_index}** annulé : *{reminder['message'][:100]}*"
+            )
 
     async def remind_clear(self, ctx: commands.Context):
         """Supprime tous vos rappels."""
