@@ -3,7 +3,6 @@ import os
 import io
 import aiohttp
 import discord
-import dotenv
 
 FAL_T2I_URL = "https://queue.fal.run/fal-ai/bytedance/seedream/v4/text-to-image"
 FAL_EDIT_URL = "https://queue.fal.run/fal-ai/bytedance/seedream/v4/edit"

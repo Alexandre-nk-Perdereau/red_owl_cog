@@ -1,5 +1,4 @@
 import discord
-import dotenv
 from redbot.core import Config, commands
 
 from .seedream_commands import SeedreamCommands
