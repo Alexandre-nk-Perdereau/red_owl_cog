@@ -1,10 +1,8 @@
-import discord
 from redbot.core import Config, commands
 
 from .seedream_commands import SeedreamCommands
 from .dice_commands import DiceCommands
-import asyncio
-from datetime import datetime, timedelta
+from .reminder_commands import ReminderCommands
 
 
 class RedOwlCog(commands.Cog):
@@ -15,6 +13,7 @@ class RedOwlCog(commands.Cog):
         self.config.register_guild(**default_guild)
         self.dice_commands = DiceCommands()
         self.seedream_commands = SeedreamCommands(bot)
+        self.reminder_commands = ReminderCommands(bot, self.config)
 
     @commands.hybrid_command(aliases=["h"])
     async def hexa(self, ctx, num_dice: int, extra_success: int = 0):
@@ -26,43 +25,30 @@ class RedOwlCog(commands.Cog):
         """Lance 4 dés FATE (-1, 0, +1) avec bonus optionnel."""
         await self.dice_commands.fate(ctx, bonus)
 
+    @commands.hybrid_command(aliases=["reminder", "remindme"])
+    async def remind(self, ctx, duration: str, *, message: str = "Votre rappel !"):
+        """Crée un rappel (ex: 10m, 2h30m, 1d3h)."""
+        await self.reminder_commands.remind(ctx, duration, message=message)
+
     @commands.hybrid_command()
-    async def remind_me(self, ctx, duration: str, *, message: str = None):
-        """Définit un rappel (ex: 10m, 2h, 3d)."""
-        time_units = {"m": "minutes", "h": "hours", "d": "days"}
+    async def remind_repeat(self, ctx, interval: str, *, message: str = "Rappel récurrent"):
+        """Crée un rappel récurrent (ex: 1h, 1d)."""
+        await self.reminder_commands.remind_repeat(ctx, interval, message=message)
 
-        try:
-            amount = int(duration[:-1])
-            unit = duration[-1].lower()
-            if unit not in time_units:
-                raise ValueError
-        except (ValueError, IndexError):
-            await ctx.send(
-                "Format de durée invalide. Utilisez un nombre suivi de 'm' (minutes), 'h' (heures) ou 'd' (jours)."
-            )
-            return
+    @commands.hybrid_command(aliases=["reminders", "reminderlist"])
+    async def remind_list(self, ctx):
+        """Liste tous vos rappels actifs."""
+        await self.reminder_commands.remind_list(ctx)
 
-        reminder_time = datetime.now() + timedelta(**{time_units[unit]: amount})
-        human_readable_time = reminder_time.strftime("%d/%m/%Y à %H:%M:%S")
+    @commands.hybrid_command(aliases=["remindercancel", "delreminder"])
+    async def remind_cancel(self, ctx, reminder_index: int):
+        """Annule un rappel spécifique."""
+        await self.reminder_commands.remind_cancel(ctx, reminder_index)
 
-        reminder_text = message or "Pas de message de rappel spécifié."
-
-        await ctx.send(f"Rappel défini pour le {human_readable_time}.")
-
-        async def send_reminder():
-            await asyncio.sleep((reminder_time - datetime.now()).total_seconds())
-
-            if isinstance(ctx.interaction, discord.Interaction):
-                await ctx.send(
-                    f"{ctx.author.mention}, voici votre rappel : {reminder_text}"
-                )
-            else:
-                reminder_message = await ctx.channel.fetch_message(ctx.message.id)
-                await ctx.send(
-                    f"{ctx.author.mention}, voici votre rappel : {reminder_message.jump_url}"
-                )
-
-        self.bot.loop.create_task(send_reminder())
+    @commands.hybrid_command(aliases=["reminderclear", "clearreminders"])
+    async def remind_clear(self, ctx):
+        """Supprime tous vos rappels."""
+        await self.reminder_commands.remind_clear(ctx)
 
     @commands.hybrid_command(name="gen")
     async def gen(self, ctx, *, query: str):
